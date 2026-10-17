@@ -67,12 +67,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-CUSTOM_CSS = """
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-<style>
-/* デジタル庁デザインシステム準拠 基本フォント設定（一回り拡大） */
+RAW_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
 html, body, .stApp, .main, div[data-testid="stAppViewContainer"] {
     font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
     color: #1A1A1C;
@@ -80,8 +76,6 @@ html, body, .stApp, .main, div[data-testid="stAppViewContainer"] {
     line-height: 1.65;
     font-variant-numeric: tabular-nums;
 }
-
-/* Material Symbols / Streamlit アイコンのフォント保護（文字被りバグの完全解消） */
 [class*="material-symbols"],
 [data-testid*="Icon"],
 [data-testid="stExpanderToggleIcon"],
@@ -102,8 +96,6 @@ span[data-testid="stExpanderToggleIcon"],
     direction: ltr !important;
     -webkit-font-smoothing: antialiased !important;
 }
-
-/* expander のサマリーヘッダー整流化（矢印アイコンとテキストの完全分離・文字被り防止） */
 div[data-testid="stExpander"] summary {
     display: flex !important;
     align-items: center !important;
@@ -117,37 +109,25 @@ div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
     margin-right: 6px !important;
     overflow: hidden !important;
 }
-
-/* 見出しの一回りサイズアップ */
 h1 { font-size: 2.3rem !important; font-weight: 700 !important; color: #1A1A1C !important; margin-bottom: 0.8rem !important; }
 h2 { font-size: 1.85rem !important; font-weight: 700 !important; color: #1A1A1C !important; margin-bottom: 0.6rem !important; }
 h3 { font-size: 1.55rem !important; font-weight: 700 !important; color: #1A1A1C !important; margin-bottom: 0.5rem !important; }
 h4 { font-size: 1.3rem !important; font-weight: 600 !important; color: #1A1A1C !important; }
 h5 { font-size: 1.15rem !important; font-weight: 600 !important; color: #1A1A1C !important; }
-
-/* ボタンと入力コントロールのフォントサイズ拡大 */
 button, input, select, textarea, [data-baseweb="select"], [data-baseweb="input"] {
     font-size: 1.1rem !important;
 }
-
-/* タブのフォントサイズ拡大 */
 button[data-baseweb="tab"] {
     font-size: 1.15rem !important;
     padding: 12px 20px !important;
     font-weight: 600 !important;
 }
-
-/* テーブル（データフレーム/エディタ）のフォントサイズ拡大 */
 div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
     font-size: 1.05rem !important;
 }
-
-/* メイン背景とコンテナ */
 .main {
     background-color: #FFFFFF;
 }
-
-/* デジタル庁カラーヘッダー（STEP用バッジなど） */
 .header-badge {
     background: #0017C1;
     color: #FFFFFF;
@@ -159,8 +139,6 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
     margin-bottom: 10px;
     letter-spacing: 0.03em;
 }
-
-/* アラートスタイル */
 .da-alert-error {
     background-color: #FDECEC;
     border-left: 6px solid #EC0000;
@@ -191,7 +169,6 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
     font-weight: 500;
     font-size: 1.1rem;
 }
-/* 青帯：デジタル庁デザインシステム インフォメーションアラート */
 .da-alert-info {
     background-color: #EBF3FB;
     border-left: 6px solid #0017C1;
@@ -203,8 +180,6 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
     font-size: 1.15rem;
     line-height: 1.6;
 }
-
-/* コース分析カード & 診断カード */
 .analysis-box {
     background-color: #F8F9FA;
     border: 1px solid #D2D7DF;
@@ -234,8 +209,6 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
     color: #0017C1;
     margin-bottom: 6px;
 }
-
-/* KPIカードスタイル（一回り拡大） */
 .kpi-card {
     background-color: #F8F9FA;
     border: 1px solid #E2E8F0;
@@ -261,8 +234,6 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
     color: #53565A;
     margin-top: 6px;
 }
-
-/* 枠番バッジ */
 .frame-badge {
     display: inline-block;
     width: 28px;
@@ -282,8 +253,6 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
 .frame-6 { background-color: #22AA55; color: #FFFFFF; }
 .frame-7 { background-color: #FF8800; color: #FFFFFF; }
 .frame-8 { background-color: #FF88AA; color: #000000; }
-
-/* 役割バッジ */
 .role-badge-defense {
     background-color: #E2E8F0;
     color: #1E293B;
@@ -300,19 +269,14 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
     font-size: 0.9rem;
     font-weight: 700;
 }
-
-/* ==========================================================================
-   デジタル庁デザインシステム (DADS) 準拠 サイドナビゲーションメニュー
-   ========================================================================== */
 section[data-testid="stSidebar"], div[data-testid="stSidebar"] {
     background-color: #F8F9FA !important;
 }
-
-/* ラジオボタンの丸印・外枠を徹底非表示 */
 section[data-testid="stSidebar"] [data-testid="stRadio"] input[type="radio"],
 section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"] > div:first-child,
 section[data-testid="stSidebar"] [data-testid="stRadio"] label > div:first-child,
-section[data-testid="stSidebar"] [data-testid="stRadio"] svg {
+section[data-testid="stSidebar"] [data-testid="stRadio"] svg,
+section[data-testid="stSidebar"] [data-testid="stRadio"] span[data-baseweb="radio-mark"] {
     display: none !important;
     visibility: hidden !important;
     width: 0 !important;
@@ -322,8 +286,6 @@ section[data-testid="stSidebar"] [data-testid="stRadio"] svg {
     border: none !important;
     background: transparent !important;
 }
-
-/* サイドバーのラジオボタングループコンテナ */
 section[data-testid="stSidebar"] div[role="radiogroup"],
 section[data-testid="stSidebar"] [data-testid="stRadio"] > div {
     display: flex !important;
@@ -331,8 +293,6 @@ section[data-testid="stSidebar"] [data-testid="stRadio"] > div {
     gap: 4px !important;
     width: 100% !important;
 }
-
-/* 各メニュー項目の外枠：DADSリストアイテム形式 */
 section[data-testid="stSidebar"] [data-testid="stRadio"] label,
 section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"] {
     display: flex !important;
@@ -347,50 +307,34 @@ section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio
     border-left: 4px solid transparent !important;
     transition: background-color 0.15s ease, border-left-color 0.15s ease !important;
 }
-
-/* ホバー時（DADS Light Gray） */
 section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover,
 section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"]:hover {
     background-color: #EDF2F7 !important;
 }
-
-/* テキストコンテナ */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label p,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label div[data-testid="stMarkdownContainer"] p,
 section[data-testid="stSidebar"] [data-testid="stRadio"] label > div:last-child {
-    display: flex !important;
-    align-items: center !important;
-    width: 100% !important;
     font-size: 1.15rem !important;
     font-weight: 500 !important;
     color: #1A1A1C !important;
     margin: 0 !important;
     padding: 0 !important;
     line-height: 1.5 !important;
+    display: flex !important;
+    align-items: center !important;
 }
-section[data-testid="stSidebar"] [data-testid="stRadio"] label > div:last-child p {
-    margin: 0 !important;
-    padding: 0 !important;
-    font-size: 1.15rem !important;
-    color: inherit !important;
-    font-weight: inherit !important;
-}
-
-/* ホバー時のテキストカラー */
-section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover > div:last-child,
-section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover > div:last-child p {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover p,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover div[data-testid="stMarkdownContainer"] p {
     color: #0017C1 !important;
 }
-
-/* 非選択時の ◆ 記号プレフィックス */
-section[data-testid="stSidebar"] [data-testid="stRadio"] label:not(:has(input:checked)) > div:last-child::before,
-section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="false"] > div:last-child::before {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:not(:has(input:checked)) p::before,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="false"] p::before {
     content: "◆ " !important;
     font-size: 0.9rem !important;
     margin-right: 10px !important;
     color: #1A1A1C !important;
     font-weight: normal !important;
 }
-
-/* 選択中（DADS Active: 薄い青背景 #D9E5FF + 左端濃紺ボーダー + 太字青文字 + ◇ 記号） */
 section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked),
 section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"],
 section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"][aria-checked="true"],
@@ -398,26 +342,26 @@ section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio
     background-color: #D9E5FF !important;
     border-left: 4px solid #0017C1 !important;
 }
-
-section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) > div:last-child,
-section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] > div:last-child,
-section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) > div:last-child p,
-section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] > div:last-child p {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] p,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) div[data-testid="stMarkdownContainer"] p,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] div[data-testid="stMarkdownContainer"] p {
     color: #0017C1 !important;
     font-weight: 700 !important;
 }
-
-section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) > div:last-child::before,
-section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] > div:last-child::before {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p::before,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] p::before {
     content: "◇ " !important;
     font-size: 1.0rem !important;
     margin-right: 10px !important;
     color: #0017C1 !important;
     font-weight: 700 !important;
 }
-</style>
 """
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# CommonMark HTMLブロック中断（空行によるMarkdown段落化）を100%防止するため空行を除去して注入
+clean_css_code = "\n".join([line.strip() for line in RAW_CSS.splitlines() if line.strip()])
+st.markdown(f"<style>\n{clean_css_code}\n</style>", unsafe_allow_html=True)
 
 
 # ==============================================================================
