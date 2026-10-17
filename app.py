@@ -41,14 +41,19 @@ from core.evaluator import (
     evaluate_race_result,
     generate_scenario_matrix,
 )
+from core.auth import (
+    init_auth_db,
+    verify_user,
+    add_user,
+)
 
 # ==============================================================================
 # ページ基本設定 & デジタル庁デザインシステムCSS注入
 # ==============================================================================
 
 st.set_page_config(
-    page_title="競馬ポートフォリオ最適化＆リスクヘッジシミュレーター",
-    page_icon="🏇",
+    page_title="kurone no asobiba",
+    page_icon="🐾",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -183,6 +188,15 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # ==============================================================================
 
 def init_session_state():
+    # 認証データベース初期化
+    init_auth_db()
+
+    if "is_authenticated" not in st.session_state:
+        st.session_state.is_authenticated = False
+
+    if "auth_username" not in st.session_state:
+        st.session_state.auth_username = None
+
     if "simulation_started" not in st.session_state:
         st.session_state.simulation_started = False
 
@@ -1211,10 +1225,95 @@ def render_simulation_panel_fragment():
 
 
 # ==============================================================================
+# ログイン画面 (Private Portal)
+# ==============================================================================
+
+def render_login_page():
+    """未認証ユーザー向けのプライベートポータル画面
+    競馬等のキーワードは一切表示せず、シンプルで洗練されたログイン画面を提供します。
+    """
+    _, col, _ = st.columns([1, 1.8, 1])
+
+    with col:
+        st.markdown(
+            """
+            <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
+                <h1 style="font-size: 2.2rem; margin-bottom: 8px;">🐾 kurone no asobiba</h1>
+                <p style="color: #64748B; font-size: 0.95rem;">Private Member Portal & Workspace</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        tab_login, tab_register = st.tabs(["🔑 ログイン", "📝 新規アカウント作成"])
+
+        with tab_login:
+            with st.form("login_form", clear_on_submit=False):
+                username = st.text_input("ユーザー名", placeholder="ユーザー名を入力してください")
+                password = st.text_input("パスワード", type="password", placeholder="パスワードを入力してください")
+                submit = st.form_submit_button("ログイン", use_container_width=True)
+
+                if submit:
+                    if not username.strip() or not password:
+                        st.error("⚠️ ユーザー名とパスワードを入力してください。")
+                    elif verify_user(username.strip(), password):
+                        st.session_state.is_authenticated = True
+                        st.session_state.auth_username = username.strip()
+                        st.success("✅ 認証に成功しました。読み込み中...")
+                        st.rerun()
+                    else:
+                        st.error("❌ ユーザー名またはパスワードが一致しません。")
+
+        with tab_register:
+            with st.form("register_form", clear_on_submit=False):
+                new_user = st.text_input("希望のユーザー名", placeholder="半角英数字を推奨")
+                new_pw = st.text_input("パスワード", type="password", placeholder="8文字以上を推奨")
+                new_pw_confirm = st.text_input("パスワード（確認用）", type="password", placeholder="もう一度入力してください")
+                reg_submit = st.form_submit_button("アカウントを作成する", use_container_width=True)
+
+                if reg_submit:
+                    if not new_user.strip() or not new_pw:
+                        st.error("⚠️ ユーザー名とパスワードを入力してください。")
+                    elif new_pw != new_pw_confirm:
+                        st.error("⚠️ 確認用パスワードが一致しません。")
+                    elif len(new_pw) < 4:
+                        st.error("⚠️ パスワードは4文字以上で設定してください。")
+                    else:
+                        success = add_user(new_user.strip(), new_pw)
+                        if success:
+                            st.success(f"🎉 アカウント「{new_user.strip()}」を作成しました！「🔑 ログイン」タブからログインしてください。")
+                        else:
+                            st.error("❌ このユーザー名は既に使用されています。別のユーザー名をお試しください。")
+
+        st.markdown(
+            """
+            <div style="text-align: center; margin-top: 40px; color: #94A3B8; font-size: 0.8rem;">
+                &copy; 2026 kurone no asobiba. Authorized members only.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+# ==============================================================================
 # メインエントリポイント
 # ==============================================================================
 
 def main():
+    if not st.session_state.is_authenticated:
+        render_login_page()
+        return
+
+    # 認証済みの場合、サイドバー上部にユーザー情報とログアウトボタンを設置
+    with st.sidebar:
+        st.markdown("### 🐾 kurone no asobiba")
+        st.caption(f"👤 ログイン中: **{st.session_state.auth_username}**")
+        if st.button("🚪 ログアウト", use_container_width=True):
+            st.session_state.is_authenticated = False
+            st.session_state.auth_username = None
+            st.rerun()
+        st.divider()
+
     if not st.session_state.simulation_started:
         render_phase1()
     else:
@@ -1223,3 +1322,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
