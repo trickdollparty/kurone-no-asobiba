@@ -45,3 +45,8 @@ htmlcov/
 *.db
 *.sqlite3
 
+# Local credentials
+pass.txt
+*.txt
+
+

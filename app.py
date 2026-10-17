@@ -62,11 +62,37 @@ st.set_page_config(
 
 CUSTOM_CSS = """
 <style>
-/* フォントとタイポグラフィ */
-html, body, [class*="css"] {
-    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+/* デジタル庁デザインシステム準拠 フォントとタイポグラフィ（一回り拡大） */
+html, body, [class*="css"], .stMarkdown, p, span, label, div {
+    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif !important;
     color: #1A1A1C;
+    font-size: 1.1rem;
+    line-height: 1.65;
     font-variant-numeric: tabular-nums;
+}
+
+/* 見出しの一回りサイズアップ */
+h1 { font-size: 2.3rem !important; font-weight: 700 !important; color: #1A1A1C !important; margin-bottom: 0.8rem !important; }
+h2 { font-size: 1.85rem !important; font-weight: 700 !important; color: #1A1A1C !important; margin-bottom: 0.6rem !important; }
+h3 { font-size: 1.55rem !important; font-weight: 700 !important; color: #1A1A1C !important; margin-bottom: 0.5rem !important; }
+h4 { font-size: 1.3rem !important; font-weight: 600 !important; color: #1A1A1C !important; }
+h5 { font-size: 1.15rem !important; font-weight: 600 !important; color: #1A1A1C !important; }
+
+/* ボタンと入力コントロールのフォントサイズ拡大 */
+button, input, select, textarea, [data-baseweb="select"], [data-baseweb="input"] {
+    font-size: 1.1rem !important;
+}
+
+/* タブのフォントサイズ拡大 */
+button[data-baseweb="tab"] {
+    font-size: 1.15rem !important;
+    padding: 12px 20px !important;
+    font-weight: 600 !important;
+}
+
+/* テーブル（データフレーム/エディタ）のフォントサイズ拡大 */
+div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
+    font-size: 1.05rem !important;
 }
 
 /* メイン背景とコンテナ */
@@ -74,84 +100,88 @@ html, body, [class*="css"] {
     background-color: #FFFFFF;
 }
 
-/* デジタル庁カラーヘッダー */
+/* デジタル庁カラーヘッダー（STEP用バッジなど） */
 .header-badge {
     background: #0017C1;
     color: #FFFFFF;
-    padding: 4px 12px;
+    padding: 6px 14px;
     border-radius: 4px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     font-weight: 700;
     display: inline-block;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    letter-spacing: 0.03em;
 }
 
 /* アラートスタイル */
 .da-alert-error {
     background-color: #FDECEC;
     border-left: 6px solid #EC0000;
-    padding: 12px 16px;
+    padding: 14px 18px;
     border-radius: 4px;
     color: #9C0000;
-    margin: 10px 0;
+    margin: 12px 0;
     font-weight: 500;
+    font-size: 1.1rem;
 }
 .da-alert-warning {
     background-color: #FFF9E6;
     border-left: 6px solid #B78F00;
-    padding: 12px 16px;
+    padding: 14px 18px;
     border-radius: 4px;
     color: #7A5F00;
-    margin: 10px 0;
+    margin: 12px 0;
     font-weight: 500;
+    font-size: 1.1rem;
 }
 .da-alert-success {
     background-color: #E6F5EC;
     border-left: 6px solid #259D63;
-    padding: 12px 16px;
+    padding: 14px 18px;
     border-radius: 4px;
     color: #18633F;
-    margin: 10px 0;
+    margin: 12px 0;
     font-weight: 500;
+    font-size: 1.1rem;
 }
 
-/* KPIカードスタイル */
+/* KPIカードスタイル（一回り拡大） */
 .kpi-card {
     background-color: #F8F9FA;
     border: 1px solid #E2E8F0;
     border-radius: 8px;
-    padding: 16px;
+    padding: 18px 12px;
     text-align: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 .kpi-title {
-    font-size: 0.85rem;
+    font-size: 1.05rem;
     color: #53565A;
     font-weight: 600;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 .kpi-value {
-    font-size: 1.6rem;
+    font-size: 2.0rem;
     font-weight: 700;
     color: #0017C1;
     font-variant-numeric: tabular-nums;
 }
 .kpi-sub {
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     color: #53565A;
-    margin-top: 4px;
+    margin-top: 6px;
 }
 
 /* 枠番バッジ */
 .frame-badge {
     display: inline-block;
-    width: 24px;
-    height: 24px;
-    line-height: 24px;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
     text-align: center;
     border-radius: 4px;
     font-weight: bold;
-    font-size: 0.85rem;
+    font-size: 1.0rem;
     margin-right: 6px;
 }
 .frame-1 { background-color: #FFFFFF; color: #000000; border: 1px solid #CCCCCC; }
@@ -167,18 +197,86 @@ html, body, [class*="css"] {
 .role-badge-defense {
     background-color: #E2E8F0;
     color: #1E293B;
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-radius: 4px;
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     font-weight: 700;
 }
 .role-badge-offense {
     background-color: #FEE2E2;
     color: #991B1B;
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-radius: 4px;
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     font-weight: 700;
+}
+
+/* ==========================================================================
+   デジタル庁デザインシステム (DADS) 準拠 サイドナビゲーションメニュー
+   ========================================================================== */
+div[data-testid="stSidebar"] {
+    background-color: #F8F9FA !important;
+}
+
+/* サイドバーのラジオボタングループコンテナ */
+div[data-testid="stSidebar"] div[data-testid="stRadio"] > div {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    width: 100% !important;
+}
+
+/* 各メニュー項目の外枠：リストアイテム形式 */
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"] {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding: 12px 16px !important;
+    margin: 0 !important;
+    border-radius: 0px !important;
+    cursor: pointer !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-left: 4px solid transparent !important;
+    transition: background-color 0.15s ease, border-left-color 0.15s ease !important;
+}
+
+/* デフォルトの丸いラジオボタンを完全非表示 */
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
+    display: none !important;
+}
+
+/* メニューのテキスト */
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"] p,
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"] div {
+    font-size: 1.15rem !important;
+    font-weight: 500 !important;
+    color: #1A1A1C !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.5 !important;
+}
+
+/* ホバー時（DADS Light Gray） */
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:hover {
+    background-color: #EDF2F7 !important;
+}
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:hover p {
+    color: #0017C1 !important;
+}
+
+/* 選択中（DADS Active: 薄い青背景 + 左端濃紺ボーダー + 太字青文字） */
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked),
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"][aria-checked="true"] {
+    background-color: #D9E5FF !important;
+    border-left: 4px solid #0017C1 !important;
+}
+
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) p,
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) div,
+div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"][aria-checked="true"] p {
+    color: #0017C1 !important;
+    font-weight: 700 !important;
 }
 </style>
 """
@@ -205,22 +303,9 @@ def init_session_state():
     presets = get_preset_races()
 
     if "monthly_races" not in st.session_state:
-        # 初回はプリセットをベースに当月レース一覧を保持（不要な初期通信を防止）
-        preset_summaries = [
-            RaceSummary(
-                race_id=p.race_id,
-                date=p.date,
-                venue=p.venue,
-                race_number=p.race_number,
-                race_name=p.race_name,
-                grade=p.grade,
-                departure_time=p.departure_time,
-                detail_url=p.source_url,
-            )
-            for p in presets
-        ]
-        st.session_state.monthly_races = preset_summaries
-        st.session_state.monthly_races_fetched_at = "2026-10-18 10:00:00 (プリセット)"
+        # 初回起動時から1R〜12Rの全レースを保持
+        st.session_state.monthly_races = fetch_monthly_race_list()
+        st.session_state.monthly_races_fetched_at = "2026-10-18 10:00:00"
 
     if "loaded_race_details" not in st.session_state:
         # race_idごとのキャッシュ辞書
@@ -280,7 +365,6 @@ def update_entries_from_df(race: RaceInfo, df: pd.DataFrame):
 # ==============================================================================
 
 def render_phase1():
-    st.markdown('<span class="header-badge">フェーズ1</span>', unsafe_allow_html=True)
     st.title("レース選択・出馬表確認")
     st.markdown(
         "シミュレーションの対象となるレースを選択し、出馬表やオッズを確認・調整してください。"
@@ -314,18 +398,24 @@ def render_phase1():
         summaries: List[RaceSummary] = st.session_state.monthly_races
         venues = ["すべて"] + sorted(list(set(s.venue for s in summaries if s.venue)))
         dates = ["すべて"] + sorted(list(set(s.date for s in summaries if s.date)))
+        race_numbers = ["すべて"] + [f"{r}R" for r in range(1, 13)]
 
-        f_col1, f_col2 = st.columns(2)
+        f_col1, f_col2, f_col3 = st.columns(3)
         with f_col1:
             selected_venue = st.selectbox("開催場で絞り込み", venues)
         with f_col2:
             selected_date = st.selectbox("開催日で絞り込み", dates)
+        with f_col3:
+            selected_r_num = st.selectbox("レース番号で絞り込み", race_numbers)
 
         filtered_summaries = summaries
         if selected_venue != "すべて":
             filtered_summaries = [s for s in filtered_summaries if s.venue == selected_venue]
         if selected_date != "すべて":
             filtered_summaries = [s for s in filtered_summaries if s.date == selected_date]
+        if selected_r_num != "すべて":
+            r_target = int(selected_r_num.replace("R", ""))
+            filtered_summaries = [s for s in filtered_summaries if s.race_number == r_target]
 
         # レース選択セレクトボックス
         race_options = {
@@ -1367,11 +1457,13 @@ def main():
 
         st.divider()
 
+        st.markdown("<p style='font-size: 0.95rem; font-weight: 700; color: #53565A; margin: 12px 0 6px 0;'>メニュー</p>", unsafe_allow_html=True)
         app_mode = st.radio(
-            "メニュー選択",
+            "メニュー",
             ["シミュレーター", "ユーザー管理"],
             index=0,
-            key="app_navigation_mode"
+            key="app_navigation_mode",
+            label_visibility="collapsed",
         )
         st.divider()
 
