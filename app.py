@@ -45,6 +45,8 @@ from core.auth import (
     init_auth_db,
     verify_user,
     add_user,
+    get_all_users,
+    delete_user,
 )
 
 # ==============================================================================
@@ -1231,6 +1233,7 @@ def render_simulation_panel_fragment():
 def render_login_page():
     """未認証ユーザー向けのプライベートポータル画面
     競馬等のキーワードは一切表示せず、シンプルで洗練されたログイン画面を提供します。
+    新規登録機能は管理者ログイン後のみ利用可能なため、ここには表示しません。
     """
     _, col, _ = st.columns([1, 1.8, 1])
 
@@ -1245,45 +1248,22 @@ def render_login_page():
             unsafe_allow_html=True,
         )
 
-        tab_login, tab_register = st.tabs(["🔑 ログイン", "📝 新規アカウント作成"])
+        with st.form("login_form", clear_on_submit=False):
+            st.markdown("##### 🔑 ログイン")
+            username = st.text_input("ユーザー名", placeholder="ユーザー名を入力してください")
+            password = st.text_input("パスワード", type="password", placeholder="パスワードを入力してください")
+            submit = st.form_submit_button("ログイン", use_container_width=True)
 
-        with tab_login:
-            with st.form("login_form", clear_on_submit=False):
-                username = st.text_input("ユーザー名", placeholder="ユーザー名を入力してください")
-                password = st.text_input("パスワード", type="password", placeholder="パスワードを入力してください")
-                submit = st.form_submit_button("ログイン", use_container_width=True)
-
-                if submit:
-                    if not username.strip() or not password:
-                        st.error("⚠️ ユーザー名とパスワードを入力してください。")
-                    elif verify_user(username.strip(), password):
-                        st.session_state.is_authenticated = True
-                        st.session_state.auth_username = username.strip()
-                        st.success("✅ 認証に成功しました。読み込み中...")
-                        st.rerun()
-                    else:
-                        st.error("❌ ユーザー名またはパスワードが一致しません。")
-
-        with tab_register:
-            with st.form("register_form", clear_on_submit=False):
-                new_user = st.text_input("希望のユーザー名", placeholder="半角英数字を推奨")
-                new_pw = st.text_input("パスワード", type="password", placeholder="8文字以上を推奨")
-                new_pw_confirm = st.text_input("パスワード（確認用）", type="password", placeholder="もう一度入力してください")
-                reg_submit = st.form_submit_button("アカウントを作成する", use_container_width=True)
-
-                if reg_submit:
-                    if not new_user.strip() or not new_pw:
-                        st.error("⚠️ ユーザー名とパスワードを入力してください。")
-                    elif new_pw != new_pw_confirm:
-                        st.error("⚠️ 確認用パスワードが一致しません。")
-                    elif len(new_pw) < 4:
-                        st.error("⚠️ パスワードは4文字以上で設定してください。")
-                    else:
-                        success = add_user(new_user.strip(), new_pw)
-                        if success:
-                            st.success(f"🎉 アカウント「{new_user.strip()}」を作成しました！「🔑 ログイン」タブからログインしてください。")
-                        else:
-                            st.error("❌ このユーザー名は既に使用されています。別のユーザー名をお試しください。")
+            if submit:
+                if not username.strip() or not password:
+                    st.error("⚠️ ユーザー名とパスワードを入力してください。")
+                elif verify_user(username.strip(), password):
+                    st.session_state.is_authenticated = True
+                    st.session_state.auth_username = username.strip()
+                    st.success("✅ 認証に成功しました。読み込み中...")
+                    st.rerun()
+                else:
+                    st.error("❌ ユーザー名またはパスワードが一致しません。")
 
         st.markdown(
             """
@@ -1296,6 +1276,75 @@ def render_login_page():
 
 
 # ==============================================================================
+# ユーザー管理画面 (管理者専用)
+# ==============================================================================
+
+def render_user_management_page():
+    """管理者用ユーザー管理画面
+    ログイン後にのみアクセス可能。登録ユーザー一覧の確認、新規ユーザー追加、ユーザー削除を行います。
+    """
+    st.markdown(
+        """
+        <div style="margin-bottom: 24px;">
+            <div class="header-badge">ADMINISTRATION</div>
+            <h1 style="font-size: 2rem; margin: 0 0 8px 0; color: #1A1A1C;">👥 ユーザー管理</h1>
+            <p style="color: #53565A; margin: 0;">アプリを利用可能なユーザーの追加・削除・一覧確認を行います。</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col1, col2 = st.columns([1.2, 1])
+
+    with col1:
+        st.markdown("### 📋 登録済みユーザー一覧")
+        users = get_all_users()
+        if users:
+            df_users = pd.DataFrame(users)
+            df_users.rename(columns={"id": "ID", "username": "ユーザー名", "created_at": "登録日時"}, inplace=True)
+            st.dataframe(df_users, use_container_width=True, hide_index=True)
+        else:
+            st.info("登録されているユーザーはいません。")
+
+        st.markdown("---")
+        st.markdown("### 🗑️ ユーザー削除")
+        user_list = [u["username"] for u in users if u["username"] != "kurone" and u["username"] != st.session_state.auth_username]
+        if user_list:
+            selected_user_to_delete = st.selectbox("削除するユーザーを選択してください", user_list)
+            if st.button("❌ このユーザーを削除する", type="secondary"):
+                if delete_user(selected_user_to_delete):
+                    st.success(f"ユーザー「{selected_user_to_delete}」を削除しました。")
+                    st.rerun()
+                else:
+                    st.error("削除に失敗しました。")
+        else:
+            st.caption("※削除可能な追加ユーザーは現在いません（管理者 kurone および現在ログイン中のアカウントは保護されています）。")
+
+    with col2:
+        st.markdown("### ➕ 新規ユーザー追加")
+        with st.form("admin_add_user_form", clear_on_submit=True):
+            new_user = st.text_input("新規ユーザー名", placeholder="半角英数字を推奨")
+            new_pw = st.text_input("パスワード", type="password", placeholder="4文字以上")
+            new_pw_confirm = st.text_input("パスワード（確認用）", type="password", placeholder="もう一度入力してください")
+            submit_add = st.form_submit_button("➕ ユーザーを登録する", use_container_width=True)
+
+            if submit_add:
+                if not new_user.strip() or not new_pw:
+                    st.error("⚠️ ユーザー名とパスワードを入力してください。")
+                elif new_pw != new_pw_confirm:
+                    st.error("⚠️ 確認用パスワードが一致しません。")
+                elif len(new_pw) < 4:
+                    st.error("⚠️ パスワードは4文字以上で設定してください。")
+                else:
+                    success = add_user(new_user.strip(), new_pw)
+                    if success:
+                        st.success(f"🎉 新規ユーザー「{new_user.strip()}」を登録しました！")
+                        st.rerun()
+                    else:
+                        st.error("❌ このユーザー名は既に使用されています。別のユーザー名をお試しください。")
+
+
+# ==============================================================================
 # メインエントリポイント
 # ==============================================================================
 
@@ -1304,22 +1353,38 @@ def main():
         render_login_page()
         return
 
-    # 認証済みの場合、サイドバー上部にユーザー情報とログアウトボタンを設置
+    # 認証済みの場合、サイドバー上部にユーザー情報、ログアウトボタン、ナビゲーションを設置
     with st.sidebar:
         st.markdown("### 🐾 kurone no asobiba")
-        st.caption(f"👤 ログイン中: **{st.session_state.auth_username}**")
-        if st.button("🚪 ログアウト", use_container_width=True):
-            st.session_state.is_authenticated = False
-            st.session_state.auth_username = None
-            st.rerun()
+        col_u, col_b = st.columns([1.2, 1])
+        with col_u:
+            st.caption(f"👤 **{st.session_state.auth_username}**")
+        with col_b:
+            if st.button("🚪 ログアウト", use_container_width=True):
+                st.session_state.is_authenticated = False
+                st.session_state.auth_username = None
+                st.rerun()
+
         st.divider()
 
-    if not st.session_state.simulation_started:
-        render_phase1()
+        app_mode = st.radio(
+            "📌 メニュー選択",
+            ["🏇 シミュレーター", "👥 ユーザー管理"],
+            index=0,
+            key="app_navigation_mode"
+        )
+        st.divider()
+
+    if app_mode == "👥 ユーザー管理":
+        render_user_management_page()
     else:
-        render_phase2()
+        if not st.session_state.simulation_started:
+            render_phase1()
+        else:
+            render_phase2()
 
 
 if __name__ == "__main__":
     main()
+
 

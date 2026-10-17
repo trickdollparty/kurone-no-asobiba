@@ -4,7 +4,7 @@ import sqlite3
 import hashlib
 import secrets
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 from datetime import datetime
 
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "users.db")
@@ -94,3 +94,26 @@ def verify_user(username: str, password: str, db_path: Optional[str] = None) -> 
     computed_hash, _ = hash_password(password, salt)
 
     return secrets.compare_digest(saved_hash, computed_hash)
+
+
+def get_all_users(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """登録されている全ユーザー情報を取得（ハッシュ・ソルトは除外）"""
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, created_at FROM users ORDER BY id ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": row["id"], "username": row["username"], "created_at": row["created_at"]} for row in rows]
+
+
+def delete_user(username: str, db_path: Optional[str] = None) -> bool:
+    """指定したユーザーを削除（初期管理者 kurone は保護）"""
+    if username == "kurone":
+        return False
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE username = ?", (username,))
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
