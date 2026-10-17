@@ -48,6 +48,13 @@ from core.auth import (
     get_all_users,
     delete_user,
 )
+from core.course_analyzer import (
+    analyze_course,
+    diagnose_advantageous_horses,
+)
+from core.optimizer import (
+    optimize_bets_from_marks,
+)
 
 # ==============================================================================
 # ページ基本設定 & デジタル庁デザインシステムCSS注入
@@ -61,14 +68,54 @@ st.set_page_config(
 )
 
 CUSTOM_CSS = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <style>
-/* デジタル庁デザインシステム準拠 フォントとタイポグラフィ（一回り拡大） */
-html, body, [class*="css"], .stMarkdown, p, span, label, div {
-    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif !important;
+/* デジタル庁デザインシステム準拠 基本フォント設定（一回り拡大） */
+html, body, .stApp, .main, div[data-testid="stAppViewContainer"] {
+    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
     color: #1A1A1C;
     font-size: 1.1rem;
     line-height: 1.65;
     font-variant-numeric: tabular-nums;
+}
+
+/* Material Symbols / Streamlit アイコンのフォント保護（文字被りバグの完全解消） */
+[class*="material-symbols"],
+[data-testid*="Icon"],
+[data-testid="stExpanderToggleIcon"],
+span[data-testid="stExpanderToggleIcon"],
+.material-symbols-rounded,
+.material-symbols-outlined,
+.material-symbols-sharp {
+    font-family: "Material Symbols Rounded", "Material Symbols Outlined", "Segoe UI Symbol", sans-serif !important;
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    word-wrap: normal !important;
+    direction: ltr !important;
+    -webkit-font-smoothing: antialiased !important;
+}
+
+/* expander のサマリーヘッダー整流化（矢印アイコンとテキストの完全分離・文字被り防止） */
+div[data-testid="stExpander"] summary {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+div[data-testid="stExpander"] summary > div:first-child,
+div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
+    flex-shrink: 0 !important;
+    width: 24px !important;
+    min-width: 24px !important;
+    margin-right: 6px !important;
+    overflow: hidden !important;
 }
 
 /* 見出しの一回りサイズアップ */
@@ -144,6 +191,49 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
     font-weight: 500;
     font-size: 1.1rem;
 }
+/* 青帯：デジタル庁デザインシステム インフォメーションアラート */
+.da-alert-info {
+    background-color: #EBF3FB;
+    border-left: 6px solid #0017C1;
+    padding: 16px 20px;
+    border-radius: 4px;
+    color: #0017C1;
+    margin: 14px 0;
+    font-weight: 600;
+    font-size: 1.15rem;
+    line-height: 1.6;
+}
+
+/* コース分析カード & 診断カード */
+.analysis-box {
+    background-color: #F8F9FA;
+    border: 1px solid #D2D7DF;
+    border-radius: 6px;
+    padding: 18px;
+    margin-bottom: 18px;
+}
+.diag-card {
+    background-color: #FFFFFF;
+    border: 1px solid #D2D7DF;
+    border-radius: 6px;
+    padding: 16px;
+    height: 100%;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.diag-card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.diag-card-horse {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0017C1;
+    margin-bottom: 6px;
+}
 
 /* KPIカードスタイル（一回り拡大） */
 .kpi-card {
@@ -214,26 +304,43 @@ div[data-testid="stDataFrame"] div, div[data-testid="stDataEditor"] div {
 /* ==========================================================================
    デジタル庁デザインシステム (DADS) 準拠 サイドナビゲーションメニュー
    ========================================================================== */
-div[data-testid="stSidebar"] {
+section[data-testid="stSidebar"], div[data-testid="stSidebar"] {
     background-color: #F8F9FA !important;
 }
 
+/* ラジオボタンの丸印・外枠を徹底非表示 */
+section[data-testid="stSidebar"] [data-testid="stRadio"] input[type="radio"],
+section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"] > div:first-child,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label > div:first-child,
+section[data-testid="stSidebar"] [data-testid="stRadio"] svg {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+
 /* サイドバーのラジオボタングループコンテナ */
-div[data-testid="stSidebar"] div[data-testid="stRadio"] > div {
+section[data-testid="stSidebar"] div[role="radiogroup"],
+section[data-testid="stSidebar"] [data-testid="stRadio"] > div {
     display: flex !important;
     flex-direction: column !important;
-    gap: 2px !important;
+    gap: 4px !important;
     width: 100% !important;
 }
 
-/* 各メニュー項目の外枠：リストアイテム形式 */
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"] {
+/* 各メニュー項目の外枠：DADSリストアイテム形式 */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label,
+section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"] {
     display: flex !important;
     align-items: center !important;
     width: 100% !important;
     padding: 12px 16px !important;
-    margin: 0 !important;
-    border-radius: 0px !important;
+    margin: 2px 0 !important;
+    border-radius: 4px !important;
     cursor: pointer !important;
     background-color: transparent !important;
     border: none !important;
@@ -241,14 +348,17 @@ div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radi
     transition: background-color 0.15s ease, border-left-color 0.15s ease !important;
 }
 
-/* デフォルトの丸いラジオボタンを完全非表示 */
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
-    display: none !important;
+/* ホバー時（DADS Light Gray） */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover,
+section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"]:hover {
+    background-color: #EDF2F7 !important;
 }
 
-/* メニューのテキスト */
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"] p,
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"] div {
+/* テキストコンテナ */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label > div:last-child {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
     font-size: 1.15rem !important;
     font-weight: 500 !important;
     color: #1A1A1C !important;
@@ -256,25 +366,52 @@ div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radi
     padding: 0 !important;
     line-height: 1.5 !important;
 }
-
-/* ホバー時（DADS Light Gray） */
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:hover {
-    background-color: #EDF2F7 !important;
+section[data-testid="stSidebar"] [data-testid="stRadio"] label > div:last-child p {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 1.15rem !important;
+    color: inherit !important;
+    font-weight: inherit !important;
 }
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:hover p {
+
+/* ホバー時のテキストカラー */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover > div:last-child,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover > div:last-child p {
     color: #0017C1 !important;
 }
 
-/* 選択中（DADS Active: 薄い青背景 + 左端濃紺ボーダー + 太字青文字） */
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked),
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"][aria-checked="true"] {
+/* 非選択時の ◆ 記号プレフィックス */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:not(:has(input:checked)) > div:last-child::before,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="false"] > div:last-child::before {
+    content: "◆ " !important;
+    font-size: 0.9rem !important;
+    margin-right: 10px !important;
+    color: #1A1A1C !important;
+    font-weight: normal !important;
+}
+
+/* 選択中（DADS Active: 薄い青背景 #D9E5FF + 左端濃紺ボーダー + 太字青文字 + ◇ 記号） */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked),
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"],
+section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"][aria-checked="true"],
+section[data-testid="stSidebar"] [data-testid="stRadio"] div[data-baseweb="radio"]:has(input:checked) {
     background-color: #D9E5FF !important;
     border-left: 4px solid #0017C1 !important;
 }
 
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) p,
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) div,
-div[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-baseweb="radio"][aria-checked="true"] p {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) > div:last-child,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] > div:last-child,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) > div:last-child p,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] > div:last-child p {
+    color: #0017C1 !important;
+    font-weight: 700 !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) > div:last-child::before,
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] > div:last-child::before {
+    content: "◇ " !important;
+    font-size: 1.0rem !important;
+    margin-right: 10px !important;
     color: #0017C1 !important;
     font-weight: 700 !important;
 }
@@ -325,9 +462,12 @@ def init_session_state():
             strategy_mode=StrategyMode.HYBRID,
             target_recovery_rate=1.0,
             min_bet_unit=100,
-            synthetic_odds_threshold=2.0,
+            synthetic_odds_threshold=4.0,
             surplus_rule="boost_min_payout",
         )
+
+    if "optimization_proposal" not in st.session_state:
+        st.session_state.optimization_proposal = None
 
 init_session_state()
 
@@ -744,9 +884,15 @@ def render_phase2():
         syn_thresh = st.number_input(
             "合成オッズ警告閾値 (倍)",
             min_value=1.1,
-            max_value=10.0,
+            max_value=20.0,
             value=float(st.session_state.sim_config.synthetic_odds_threshold),
             step=0.1,
+            format="%.2f",
+            help="合成オッズとは「どの買い目が的中しても同等の払戻を得られるよう配分した際の全体の想定オッズ」です。この値を下回ると『的中しても旨味が薄い（薄利多売・資金効率低下）』状態であることを警告します。一般的に4.00倍以上が推奨されます。",
+        )
+        st.markdown(
+            '<p style="font-size: 0.95rem; color: #53565A; margin-top: 4px; line-height: 1.5;"><strong>[tips]</strong> 合成オッズを4.00倍以上に設定することで、点数の増やしすぎや低オッズ馬券の乱立によるトリガミ・資金破綻リスクを未然に防止できます。</p>',
+            unsafe_allow_html=True,
         )
         st.session_state.sim_config.synthetic_odds_threshold = float(syn_thresh)
 
@@ -807,27 +953,168 @@ def render_phase2():
                 st.error(f"インポートエラー: {ex}")
 
     # --------------------------------------------------------------------------
-    # メイン上部：買い目構築＆オッズ編集フラグメント (@st.fragment)
+    # STEP 0：レース・コース分析 ＆ 有利馬診断 (@st.fragment)
+    # --------------------------------------------------------------------------
+    render_step0_fragment()
+
+    st.markdown("---")
+
+    # --------------------------------------------------------------------------
+    # STEP 1：買い目構築＆オッズ編集フラグメント (@st.fragment)
     # --------------------------------------------------------------------------
     render_bet_management_fragment()
 
     st.markdown("---")
 
     # --------------------------------------------------------------------------
-    # メイン中部：配分結果・KPI・チャート・シナリオ分析フラグメント (@st.fragment)
+    # STEP 2：配分結果・KPI・チャート・シナリオ分析フラグメント (@st.fragment)
     # --------------------------------------------------------------------------
     render_allocation_dashboard_fragment()
 
     st.markdown("---")
 
     # --------------------------------------------------------------------------
-    # メイン下部：着順シミュレーション＆結果検証パネル (@st.fragment)
+    # STEP 3：着順シミュレーション＆結果検証パネル (@st.fragment)
     # --------------------------------------------------------------------------
     render_simulation_panel_fragment()
 
 
 # ==============================================================================
-# フラグメント1: 買い目構築＆編集
+# フラグメント0: レース・コース分析 ＆ 有利馬診断 (STEP 0)
+# ==============================================================================
+
+@st.fragment
+def render_step0_fragment():
+    """STEP 0: 出走馬情報、レース場情報、コース、距離、有利な馬の自動診断表示フラグメント"""
+    current_race: RaceInfo = st.session_state.current_race
+
+    st.markdown('<span class="header-badge">STEP 0</span>', unsafe_allow_html=True)
+    st.subheader("レース・コース分析 ＆ 有利馬診断")
+
+    # コース分析および有利馬診断の実行
+    diag = diagnose_advantageous_horses(current_race)
+    course_info = diag["course_info"]
+
+    # 1. レース場・コース・距離・基本条件情報
+    col_c1, col_c2 = st.columns([1.2, 1.8])
+    with col_c1:
+        st.markdown(
+            f"""
+            <div class="analysis-box">
+                <div style="font-weight: 700; font-size: 1.15rem; color: #1A1A1C; margin-bottom: 8px;">
+                    {current_race.venue}競馬場 {current_race.race_number}R ({current_race.grade})
+                </div>
+                <div style="font-size: 1.05rem; line-height: 1.8; color: #333333;">
+                    コース: <strong>{current_race.surface} {current_race.distance}m</strong><br>
+                    コース形態: <strong>{course_info['layout']}</strong><br>
+                    馬場状態: <strong>{current_race.track_condition}</strong> / 天候: <strong>{current_race.weather}</strong><br>
+                    発走時刻: <strong>{current_race.departure_time}</strong><br>
+                    有利な枠順: <strong style="color: #0017C1;">{course_info['advantage_frame']}</strong><br>
+                    有利な脚質: <strong style="color: #0017C1;">{course_info['advantage_style']}</strong>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_c2:
+        st.markdown(
+            f"""
+            <div class="analysis-box">
+                <div style="font-weight: 700; font-size: 1.15rem; color: #1A1A1C; margin-bottom: 8px;">
+                    コース特徴・展開傾向解説
+                </div>
+                <p style="font-size: 1.05rem; line-height: 1.7; color: #1A1A1C; margin: 0;">
+                    {course_info['description']}
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # 2. このレース場と条件における有利な馬 診断カード (3枠)
+    st.markdown("##### このレース場と条件における有利な馬")
+    c_h1, c_h2, c_h3 = st.columns(3)
+
+    honmei = diag.get("honmei")
+    tactical = diag.get("tactical")
+    upset = diag.get("upset")
+
+    with c_h1:
+        if honmei and honmei["entry"]:
+            e = honmei["entry"]
+            st.markdown(
+                f"""
+                <div class="diag-card">
+                    <div class="diag-card-title">
+                        <span class="frame-badge frame-{e.frame_number}">{e.frame_number}</span>
+                        <span>[最有力馬] 本命推奨</span>
+                    </div>
+                    <div class="diag-card-horse">{e.horse_number}番 {e.horse_name}</div>
+                    <div style="font-size: 0.95rem; color: #53565A; margin-bottom: 8px;">
+                        騎手: {e.jockey} | 単勝 {e.win_odds:.1f}倍 ({e.popularity}番人気) | 印: {e.mark}
+                    </div>
+                    <p style="font-size: 0.95rem; line-height: 1.5; color: #1A1A1C; margin: 0;">
+                        {honmei["reason"]}
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with c_h2:
+        if tactical and tactical["entry"]:
+            e = tactical["entry"]
+            st.markdown(
+                f"""
+                <div class="diag-card">
+                    <div class="diag-card-title">
+                        <span class="frame-badge frame-{e.frame_number}">{e.frame_number}</span>
+                        <span>[展開・コース利] 舞台特注馬</span>
+                    </div>
+                    <div class="diag-card-horse">{e.horse_number}番 {e.horse_name}</div>
+                    <div style="font-size: 0.95rem; color: #53565A; margin-bottom: 8px;">
+                        騎手: {e.jockey} | 単勝 {e.win_odds:.1f}倍 ({e.popularity}番人気) | 印: {e.mark}
+                    </div>
+                    <p style="font-size: 0.95rem; line-height: 1.5; color: #1A1A1C; margin: 0;">
+                        {tactical["reason"]}
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with c_h3:
+        if upset and upset["entry"]:
+            e = upset["entry"]
+            st.markdown(
+                f"""
+                <div class="diag-card">
+                    <div class="diag-card-title">
+                        <span class="frame-badge frame-{e.frame_number}">{e.frame_number}</span>
+                        <span>[穴注目] 高配当・妙味馬</span>
+                    </div>
+                    <div class="diag-card-horse">{e.horse_number}番 {e.horse_name}</div>
+                    <div style="font-size: 0.95rem; color: #53565A; margin-bottom: 8px;">
+                        騎手: {e.jockey} | 単勝 {e.win_odds:.1f}倍 ({e.popularity}番人気) | 印: {e.mark}
+                    </div>
+                    <p style="font-size: 0.95rem; line-height: 1.5; color: #1A1A1C; margin: 0;">
+                        {upset["reason"]}
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 3. 出走馬一覧テーブル（詳細確認用）
+    with st.expander("出走馬一覧の詳細（枠番・馬番・予想印・単勝オッズ・人気・騎手）を確認する", expanded=False):
+        st.dataframe(entries_to_df(current_race.entries), use_container_width=True, hide_index=True)
+
+
+# ==============================================================================
+# フラグメント1: 買い目構築＆編集 (STEP 1)
 # ==============================================================================
 
 @st.fragment
@@ -894,6 +1181,7 @@ def render_bet_management_fragment():
             if st.button("フォーメーションを展開して追加", type="primary", use_container_width=True):
                 new_combs = generate_formation_bets(ticket_type, h_first, h_second, h_third)
                 _append_combinations(new_combs, ticket_type, bet_role, current_race)
+                st.session_state.optimization_proposal = None
                 st.success(f"{len(new_combs)}点の買い目を追加しました！")
                 st.rerun()
 
@@ -902,13 +1190,13 @@ def render_bet_management_fragment():
                 if st.button("1頭目候補の馬番でボックス展開", use_container_width=True):
                     new_combs = generate_box_bets(ticket_type, h_first)
                     _append_combinations(new_combs, ticket_type, bet_role, current_race)
+                    st.session_state.optimization_proposal = None
                     st.success(f"{len(new_combs)}点のボックス買い目を追加しました！")
                     st.rerun()
 
         with col_btn3:
             if st.button("印（◎○▲△）から推奨買い目を自動追加", use_container_width=True):
                 _auto_generate_from_marks(current_race)
-                st.success("推奨買い目を自動展開しました！")
                 st.rerun()
 
     # --------------------------------------------------------------------------
@@ -924,6 +1212,7 @@ def render_bet_management_fragment():
             with col_ed_ctrl2:
                 if st.button("全買い目をクリア", use_container_width=True):
                     st.session_state.bets = []
+                    st.session_state.optimization_proposal = None
                     st.rerun()
 
             # Data Editor用DataFrame
@@ -1031,37 +1320,15 @@ def _append_combinations(
 
 
 def _auto_generate_from_marks(race: RaceInfo):
-    """印（◎○▲△☆）から実戦的なハイブリッド買い目を自動生成"""
-    mark_horses: Dict[str, List[int]] = {"◎": [], "○": [], "▲": [], "△": [], "☆": []}
-    for e in race.entries:
-        if e.mark in mark_horses:
-            mark_horses[e.mark].append(e.horse_number)
-
-    honmei = mark_horses["◎"][0] if mark_horses["◎"] else (race.entries[0].horse_number if race.entries else None)
-    taikou = mark_horses["○"][0] if mark_horses["○"] else (race.entries[1].horse_number if len(race.entries) > 1 else None)
-    tanana = mark_horses["▲"][0] if mark_horses["▲"] else (race.entries[2].horse_number if len(race.entries) > 2 else None)
-    osae = mark_horses["△"] + mark_horses["☆"]
-    if not osae and len(race.entries) > 3:
-        osae = [e.horse_number for e in race.entries[3:6]]
-
-    # 1. 守り枠: 本命・対抗のワイド＆馬連
-    if honmei and taikou:
-        w_min, w_max = estimate_composite_odds(TicketType.WIDE, [honmei, taikou], race.entries)
-        q_min, _ = estimate_composite_odds(TicketType.QUINELLA, [honmei, taikou], race.entries)
-        w_comb = f"{min(honmei, taikou)}-{max(honmei, taikou)}"
-        st.session_state.bets.append(
-            SingleBet(ticket_type=TicketType.WIDE, combination=w_comb, odds_min=w_min, odds_max=w_max, role=BetRole.DEFENSE)
+    """印（◎○▲△☆）から警告ゼロを目指し最大100回試行して最適な買い目を自動選定"""
+    with st.spinner("警告（トリガミ・合成オッズ閾値割れ）ゼロを目指し最大100回最適化探索中..."):
+        best_bets, proposal, iters = optimize_bets_from_marks(
+            race,
+            st.session_state.sim_config,
+            max_iterations=100,
         )
-        st.session_state.bets.append(
-            SingleBet(ticket_type=TicketType.QUINELLA, combination=w_comb, odds_min=q_min, role=BetRole.DEFENSE)
-        )
-
-    # 2. 攻め枠: 三連複フォーメーション (本命 - 対抗/単穴 - 相手)
-    second_group = [h for h in [taikou, tanana] if h]
-    third_group = [h for h in ([taikou, tanana] + osae) if h]
-    if honmei and second_group and third_group:
-        trio_combs = generate_formation_bets(TicketType.TRIO, [honmei], second_group, third_group)
-        _append_combinations(trio_combs, TicketType.TRIO, BetRole.OFFENSE, race)
+    st.session_state.bets = best_bets
+    st.session_state.optimization_proposal = proposal
 
 
 # ==============================================================================
@@ -1080,6 +1347,14 @@ def render_allocation_dashboard_fragment():
 
     # 計算実行
     alloc_res: AllocationResult = allocate_funds(st.session_state.bets, st.session_state.sim_config)
+
+    # 改善提案アラート（青帯・デジタル庁デザインシステム準拠）
+    if st.session_state.optimization_proposal:
+        prop = st.session_state.optimization_proposal
+        st.markdown(
+            f'<div class="da-alert-info"><strong>[提案]</strong> 予算を {prop["additional_budget"]:,}円追加もしくは合成オッズ閾値を {prop["suggested_threshold"]:.1f} に下げる必要があります。</div>',
+            unsafe_allow_html=True,
+        )
 
     # アラートバナー
     if alloc_res.is_bankrupt:

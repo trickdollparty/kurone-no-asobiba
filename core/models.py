@@ -148,7 +148,7 @@ class SimulationConfig:
     strategy_mode: StrategyMode = StrategyMode.HYBRID
     target_recovery_rate: float = 1.0       # 守り枠の目標回収率 (1.0 = 100%元返し)
     min_bet_unit: int = 100                 # 最小購入単位（100円）
-    synthetic_odds_threshold: float = 2.0   # 合成オッズ警告閾値
+    synthetic_odds_threshold: float = 4.0   # 合成オッズ警告閾値 (デフォルト4.00)
     surplus_rule: str = "boost_min_payout"  # 余剰金配分ルール: 'boost_min_payout' (最低払戻底上げ) or 'max_odds' (最大オッズ優先)
 
     def to_dict(self) -> Dict[str, Any]:
