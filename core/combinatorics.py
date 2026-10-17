@@ -1,11 +1,11 @@
 """フォーメーション・ボックス・ながし等の買い目組み合わせ展開モジュール
 """
 from itertools import permutations, combinations
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Tuple
 from .models import TicketType
 
 
-def format_combination(ticket_type: TicketType, horses: tuple[int, ...]) -> str:
+def format_combination(ticket_type: TicketType, horses: Tuple[int, ...]) -> str:
     """券種に応じた正規化組み合わせ文字列を返す
 
     馬連・ワイド・三連複は昇順ソートしてハイフン連結 (例: '1-4', '1-2-4')

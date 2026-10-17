@@ -203,3 +203,51 @@ def test_composite_odds_estimation():
     assert w_min is not None and w_max is not None
     assert w_min <= w_max
     assert w_min > 1.0
+
+
+def test_surplus_greedy_distribution():
+    """余剰金の貪欲法配分 (boost_min_payout / max_odds) の動作検証"""
+    from core.allocator import _distribute_surplus
+
+    # 1. boost_min_payout: 想定払戻金が最小の買い目に優先加算
+    b1 = SingleBet(ticket_type=TicketType.QUINELLA, combination="1-2", odds_min=2.0, allocated_amount=500)
+    b2 = SingleBet(ticket_type=TicketType.QUINELLA, combination="1-3", odds_min=10.0, allocated_amount=500)
+    # b1の想定払戻金 = 1000円, b2の想定払戻金 = 5000円 -> b1に余剰金が優先加算される
+    surplus_left = _distribute_surplus([b1, b2], [0, 1], surplus=300, rule="boost_min_payout")
+    assert surplus_left == 0
+    assert b1.allocated_amount == 800  # 300円すべてb1に加算
+    assert b2.allocated_amount == 500
+
+    # 2. max_odds: 最もオッズの高い買い目に余剰金が優先加算
+    b3 = SingleBet(ticket_type=TicketType.TRIFECTA, combination="1-2-3", odds_min=20.0, allocated_amount=100)
+    b4 = SingleBet(ticket_type=TicketType.TRIFECTA, combination="1-2-4", odds_min=80.0, allocated_amount=100)
+    surplus_left2 = _distribute_surplus([b3, b4], [0, 1], surplus=400, rule="max_odds")
+    assert surplus_left2 == 0
+    assert b3.allocated_amount == 100
+    assert b4.allocated_amount == 500  # 400円すべて高オッズのb4に加算
+
+
+def test_preset_data_integrity():
+    """プリセット全レースのデータ整合性検証（馬名重複ゼロ・人気順一意性）"""
+    presets = get_preset_races()
+    assert len(presets) >= 4
+
+    for race in presets:
+        names = [e.horse_name for e in race.entries]
+        assert len(names) == len(set(names)), f"レース {race.race_name} で馬名が重複しています: {names}"
+
+        pop_list = [e.popularity for e in race.entries]
+        assert len(pop_list) == len(set(pop_list)), f"レース {race.race_name} で人気順が重複しています: {pop_list}"
+        assert sorted(pop_list) == list(range(1, len(race.entries) + 1))
+
+
+def test_insurance_strategy_no_offense():
+    """insurance戦略でoffenseが空の場合でも100円整数制約が保たれることの検証"""
+    bets = [
+        SingleBet(ticket_type=TicketType.WIDE, combination="1-2", odds_min=2.0, role=BetRole.DEFENSE),
+    ]
+    cfg = SimulationConfig(total_budget=5300, strategy_mode=StrategyMode.INSURANCE, target_recovery_rate=1.0)
+    res = allocate_funds(bets, cfg)
+    assert res.total_invested <= 5300
+    assert res.bets[0].allocated_amount % 100 == 0
+    assert res.remaining_budget % 100 == 0

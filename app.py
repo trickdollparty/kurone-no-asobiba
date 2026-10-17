@@ -2,6 +2,7 @@
 """
 import io
 import json
+from typing import List, Optional, Dict, Any, Tuple
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -185,19 +186,32 @@ def init_session_state():
     if "simulation_started" not in st.session_state:
         st.session_state.simulation_started = False
 
+    presets = get_preset_races()
+
     if "monthly_races" not in st.session_state:
-        # 初回はプリセットをベースに当月レース一覧を保持
-        st.session_state.monthly_races = fetch_monthly_race_list()
-        st.session_state.monthly_races_fetched_at = "2026-10-18 10:00:00"
+        # 初回はプリセットをベースに当月レース一覧を保持（不要な初期通信を防止）
+        preset_summaries = [
+            RaceSummary(
+                race_id=p.race_id,
+                date=p.date,
+                venue=p.venue,
+                race_number=p.race_number,
+                race_name=p.race_name,
+                grade=p.grade,
+                departure_time=p.departure_time,
+                detail_url=p.source_url,
+            )
+            for p in presets
+        ]
+        st.session_state.monthly_races = preset_summaries
+        st.session_state.monthly_races_fetched_at = "2026-10-18 10:00:00 (プリセット)"
 
     if "loaded_race_details" not in st.session_state:
         # race_idごとのキャッシュ辞書
-        presets = get_preset_races()
         st.session_state.loaded_race_details = {p.race_id: p for p in presets}
 
     if "current_race" not in st.session_state:
         # デフォルトは秋華賞
-        presets = get_preset_races()
         st.session_state.current_race = presets[0]
 
     if "bets" not in st.session_state:
@@ -221,7 +235,7 @@ init_session_state()
 # ヘルパー関数: 出馬表DataFrame変換
 # ==============================================================================
 
-def entries_to_df(entries: list[HorseEntry]) -> pd.DataFrame:
+def entries_to_df(entries: List[HorseEntry]) -> pd.DataFrame:
     data = []
     for e in entries:
         data.append({
@@ -281,7 +295,7 @@ def render_phase1():
                 st.rerun()
 
         # フィルタリング
-        summaries: list[RaceSummary] = st.session_state.monthly_races
+        summaries: List[RaceSummary] = st.session_state.monthly_races
         venues = ["すべて"] + sorted(list(set(s.venue for s in summaries if s.venue)))
         dates = ["すべて"] + sorted(list(set(s.date for s in summaries if s.date)))
 
@@ -539,15 +553,47 @@ def render_phase2():
         st.markdown("---")
         st.subheader("⚙️ 資金配分パラメータ")
 
-        # 総予算
-        budget_input = st.number_input(
-            "総予算 (円)",
-            min_value=1000,
-            max_value=1000000,
-            value=st.session_state.sim_config.total_budget,
-            step=1000,
-        )
-        st.session_state.sim_config.total_budget = int(budget_input)
+        # 総予算 (数値入力＋スライダー連動、100円単位、デフォルト10,000円)
+        st.markdown("**総予算 (円・100円単位)**")
+        if "budget_input_val" not in st.session_state:
+            st.session_state.budget_input_val = st.session_state.sim_config.total_budget
+
+        def _sync_num_to_slider():
+            val = int(st.session_state.sb_num_budget)
+            # 100円単位に丸め
+            val = max(1000, (val // 100) * 100)
+            st.session_state.budget_input_val = val
+            st.session_state.sim_config.total_budget = val
+
+        def _sync_slider_to_num():
+            val = int(st.session_state.sb_slider_budget)
+            st.session_state.budget_input_val = val
+            st.session_state.sim_config.total_budget = val
+
+        col_b_num, col_b_slider = st.columns([1, 1])
+        with col_b_num:
+            st.number_input(
+                "予算数値",
+                min_value=1000,
+                max_value=1000000,
+                value=st.session_state.budget_input_val,
+                step=100,
+                key="sb_num_budget",
+                on_change=_sync_num_to_slider,
+                label_visibility="collapsed",
+            )
+        with col_b_slider:
+            slider_max = max(50000, st.session_state.budget_input_val)
+            st.slider(
+                "予算スライダー",
+                min_value=1000,
+                max_value=slider_max,
+                value=st.session_state.budget_input_val,
+                step=500,
+                key="sb_slider_budget",
+                on_change=_sync_slider_to_num,
+                label_visibility="collapsed",
+            )
 
         # 戦略モード
         strategy_options = {
@@ -601,31 +647,58 @@ def render_phase2():
         st.markdown("---")
         st.subheader("💾 データ入出力 (CSV / JSON)")
 
-        # CSVエクスポート
+        # エクスポート
         if st.session_state.bets:
-            csv_data = export_bets_to_csv(st.session_state.bets)
-            st.download_button(
-                label="📥 買い目データをCSVで保存",
-                data=csv_data,
-                file_name=f"bets_{current_race.race_id}.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
+            col_exp1, col_exp2 = st.columns(2)
+            with col_exp1:
+                csv_data = export_bets_to_csv(st.session_state.bets)
+                st.download_button(
+                    label="📥 買い目CSV",
+                    data=csv_data,
+                    file_name=f"bets_{current_race.race_id}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+            with col_exp2:
+                portfolio_dump = json.dumps({
+                    "race": current_race.to_dict(),
+                    "config": st.session_state.sim_config.to_dict(),
+                    "bets": [b.to_dict() for b in st.session_state.bets],
+                }, ensure_ascii=False, indent=2)
+                st.download_button(
+                    label="📦 全体JSON",
+                    data=portfolio_dump,
+                    file_name=f"portfolio_{current_race.race_id}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
 
-        # CSVインポート
-        uploaded_csv = st.file_uploader("買い目CSVを取り込む", type=["csv"], key="bets_csv_uploader")
-        if uploaded_csv is not None:
+        # インポート
+        uploaded_file = st.file_uploader(
+            "買い目データ (CSV / JSON) のインポート",
+            type=["csv", "json"],
+            key="bets_file_uploader",
+        )
+        if uploaded_file is not None:
             try:
-                csv_content = uploaded_csv.read().decode("utf-8")
-                parsed_bets_data = import_bets_from_csv(csv_content)
-                new_bets = []
-                for b_dict in parsed_bets_data:
-                    new_bets.append(SingleBet.from_dict(b_dict))
+                content_str = uploaded_file.read().decode("utf-8")
+                if uploaded_file.name.endswith(".json"):
+                    data = json.loads(content_str)
+                    if "bets" in data:
+                        new_bets = [SingleBet.from_dict(b) for b in data["bets"]]
+                    elif isinstance(data, list):
+                        new_bets = [SingleBet.from_dict(b) for b in data]
+                    else:
+                        raise ValueError("有効な買い目JSONフォーマットではありません。")
+                else:  # CSV
+                    parsed_bets_data = import_bets_from_csv(content_str)
+                    new_bets = [SingleBet.from_dict(b) for b in parsed_bets_data]
+
                 st.session_state.bets = new_bets
                 st.success(f"{len(new_bets)}点の買い目を取り込みました！")
                 st.rerun()
             except Exception as ex:
-                st.error(f"CSV取り込みエラー: {ex}")
+                st.error(f"インポートエラー: {ex}")
 
     # --------------------------------------------------------------------------
     # メイン上部：買い目構築＆オッズ編集フラグメント (@st.fragment)
@@ -827,7 +900,7 @@ def render_bet_management_fragment():
 
 
 def _append_combinations(
-    combs: list[str],
+    combs: List[str],
     ticket_type: TicketType,
     role: BetRole,
     race: RaceInfo,
@@ -852,17 +925,18 @@ def _append_combinations(
 
 
 def _auto_generate_from_marks(race: RaceInfo):
-    """印（◎○▲△）から実戦的なハイブリッド買い目を自動生成"""
-    mark_horses = {e.mark: e.horse_number for e in race.entries if e.mark != "無"}
-    honmei = mark_horses.get("◎")
-    taikou = mark_horses.get("○")
-    tanana = mark_horses.get("▲")
-    osae = [e.horse_number for e in race.entries if e.mark in ("△", "☆")]
+    """印（◎○▲△☆）から実戦的なハイブリッド買い目を自動生成"""
+    mark_horses: Dict[str, List[int]] = {"◎": [], "○": [], "▲": [], "△": [], "☆": []}
+    for e in race.entries:
+        if e.mark in mark_horses:
+            mark_horses[e.mark].append(e.horse_number)
 
-    if not honmei and race.entries:
-        honmei = race.entries[0].horse_number
-    if not taikou and len(race.entries) > 1:
-        taikou = race.entries[1].horse_number
+    honmei = mark_horses["◎"][0] if mark_horses["◎"] else (race.entries[0].horse_number if race.entries else None)
+    taikou = mark_horses["○"][0] if mark_horses["○"] else (race.entries[1].horse_number if len(race.entries) > 1 else None)
+    tanana = mark_horses["▲"][0] if mark_horses["▲"] else (race.entries[2].horse_number if len(race.entries) > 2 else None)
+    osae = mark_horses["△"] + mark_horses["☆"]
+    if not osae and len(race.entries) > 3:
+        osae = [e.horse_number for e in race.entries[3:6]]
 
     # 1. 守り枠: 本命・対抗のワイド＆馬連
     if honmei and taikou:

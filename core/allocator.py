@@ -65,8 +65,6 @@ def allocate_funds(bets: List[SingleBet], config: SimulationConfig) -> Allocatio
             f"合成オッズが {synthetic_odds:.2f}倍 と閾値({config.synthetic_odds_threshold:.1f}倍)を下回っています。"
         )
 
-    # 1点あたり最低100円購入した場合の最低必要予算
-    min_possible_budget = len(allocated_bets) * config.min_bet_unit
 
     mode = config.strategy_mode
     if mode == StrategyMode.HYBRID:
@@ -115,10 +113,11 @@ def _allocate_hybrid(
     # 2. 破綻判定
     if defense_total > total_budget:
         shortage = defense_total - total_budget
-        max_possible_rate = total_budget / sum(
-            np.ceil(1.0 / (b.odds_min * 100.0)) * 100.0 for idx, b in enumerate(bets) if idx in defense_indices and b.odds_min > 0
-        ) if defense_indices else 0.0
-        sugg_pct = int(max_possible_rate * 100)
+        # 現在の目標で必要な守り合計に対して、予算が占める割合から実現可能な回収率を推定
+        if defense_total > 0:
+            sugg_pct = int((total_budget / defense_total) * config.target_recovery_rate * 100)
+        else:
+            sugg_pct = 0
 
         err_msg = (
             f"守り枠の確保に必要な資金({defense_total:,}円)が総予算({total_budget:,}円)を超過しています。"
@@ -331,9 +330,10 @@ def _allocate_insurance(
             if remaining_budget >= config.min_bet_unit:
                 remaining_budget = _distribute_surplus(bets, offense_indices, remaining_budget, config.surplus_rule)
     else:
-        # offenseがない場合は保険枠に余剰金を加算
-        bets[best_defense_idx].allocated_amount += remaining_budget
-        remaining_budget = 0
+        # offenseがない場合は保険枠に余剰金を加算（100円単位制約を遵守）
+        add_amount = (remaining_budget // 100) * 100
+        bets[best_defense_idx].allocated_amount += add_amount
+        remaining_budget -= add_amount
 
     return _finalize_result(bets, total_budget, remaining_budget, warnings)
 
@@ -345,6 +345,8 @@ def _distribute_surplus(
     rule: str,
 ) -> int:
     """100円ステップで余剰金を貪欲法配分
+
+    要件: np.argmin で想定最低払戻金が最小の買い目を特定し、100円を加算する操作を繰り返す
 
     Args:
         bets: 全買い目リスト
@@ -363,17 +365,17 @@ def _distribute_surplus(
 
     for _ in range(loops):
         if rule == "max_odds":
-            # 最もオッズの高い買い目
-            selected_idx = max(target_indices, key=lambda i: bets[i].odds_min)
+            # 最もオッズの高い買い目をnp.argmaxで特定
+            odds_arr = np.array([bets[i].odds_min for i in target_indices])
+            local_idx = int(np.argmax(odds_arr))
+            selected_idx = target_indices[local_idx]
         else:  # 'boost_min_payout' デフォルト
-            # 想定払戻金が最も小さい買い目を特定
-            # 配分額が0のものは除外するか、あるいは払戻金0として最優先される
-            selected_idx = min(
-                target_indices,
-                key=lambda i: bets[i].allocated_amount * bets[i].odds_min
-                if bets[i].allocated_amount > 0
-                else 0.0,
-            )
+            # 想定最低払戻金 (allocated_amount * odds_min) が最も小さい買い目をnp.argminで特定
+            payouts = np.array([
+                bets[i].allocated_amount * bets[i].odds_min for i in target_indices
+            ])
+            local_idx = int(np.argmin(payouts))
+            selected_idx = target_indices[local_idx]
 
         bets[selected_idx].allocated_amount += step
         surplus -= step
