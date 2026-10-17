@@ -194,16 +194,16 @@ def generate_scenario_matrix(bets: List[SingleBet]) -> pd.DataFrame:
         rec_max = (def_max / total_invested * 100) if total_invested > 0 else 0
         rec_str = f"{rec_min:.1f}% 〜 {rec_max:.1f}%" if rec_min != rec_max else f"{rec_min:.1f}%"
         rows.append({
-            "シナリオ": "🛡️ 守りのみ的中",
+            "シナリオ": "守りのみ的中",
             "投資額": f"{total_invested:,}円",
             "想定払戻金": p_str,
             "純利益": prof_str,
             "回収率": rec_str,
-            "判定": "元金回収・保険" if rec_min >= 100 else "⚠️ トリガミ注意",
+            "判定": "元金回収・保険" if rec_min >= 100 else "トリガミ注意",
         })
     else:
         rows.append({
-            "シナリオ": "🛡️ 守りのみ的中",
+            "シナリオ": "守りのみ的中",
             "投資額": f"{total_invested:,}円",
             "想定払戻金": "なし",
             "純利益": "なし",
@@ -221,7 +221,7 @@ def generate_scenario_matrix(bets: List[SingleBet]) -> pd.DataFrame:
         rec_max = (off_max / total_invested * 100) if total_invested > 0 else 0
         rec_str = f"{rec_min:.1f}% 〜 {rec_max:.1f}%" if rec_min != rec_max else f"{rec_min:.1f}%"
         rows.append({
-            "シナリオ": "⚔️ 攻めのみ的中",
+            "シナリオ": "攻めのみ的中",
             "投資額": f"{total_invested:,}円",
             "想定払戻金": p_str,
             "純利益": prof_str,
@@ -230,7 +230,7 @@ def generate_scenario_matrix(bets: List[SingleBet]) -> pd.DataFrame:
         })
     else:
         rows.append({
-            "シナリオ": "⚔️ 攻めのみ的中",
+            "シナリオ": "攻めのみ的中",
             "投資額": f"{total_invested:,}円",
             "想定払戻金": "なし",
             "純利益": "なし",
@@ -248,7 +248,7 @@ def generate_scenario_matrix(bets: List[SingleBet]) -> pd.DataFrame:
         rec_max = (double_max / total_invested * 100) if total_invested > 0 else 0
         rec_str = f"{rec_min:.1f}% 〜 {rec_max:.1f}%" if rec_min != rec_max else f"{rec_min:.1f}%"
         rows.append({
-            "シナリオ": "🎉 ダブル的中（守り＋攻め）",
+            "シナリオ": "ダブル的中（守り＋攻め）",
             "投資額": f"{total_invested:,}円",
             "想定払戻金": p_str,
             "純利益": prof_str,
@@ -257,7 +257,7 @@ def generate_scenario_matrix(bets: List[SingleBet]) -> pd.DataFrame:
         })
     else:
         rows.append({
-            "シナリオ": "🎉 ダブル的中（守り＋攻め）",
+            "シナリオ": "ダブル的中（守り＋攻め）",
             "投資額": f"{total_invested:,}円",
             "想定払戻金": "-",
             "純利益": "-",
@@ -267,7 +267,7 @@ def generate_scenario_matrix(bets: List[SingleBet]) -> pd.DataFrame:
 
     # 4. 全ハズレ
     rows.append({
-        "シナリオ": "💀 全ハズレ",
+        "シナリオ": "全ハズレ",
         "投資額": f"{total_invested:,}円",
         "想定払戻金": "0円",
         "純利益": f"-{total_invested:,}円",

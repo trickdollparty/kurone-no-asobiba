@@ -152,10 +152,10 @@ def test_scenario_matrix():
     ]
     df = generate_scenario_matrix(bets)
     assert len(df) == 4
-    assert "🛡️ 守りのみ的中" in df["シナリオ"].values
-    assert "⚔️ 攻めのみ的中" in df["シナリオ"].values
-    assert "🎉 ダブル的中（守り＋攻め）" in df["シナリオ"].values
-    assert "💀 全ハズレ" in df["シナリオ"].values
+    assert "守りのみ的中" in df["シナリオ"].values
+    assert "攻めのみ的中" in df["シナリオ"].values
+    assert "ダブル的中（守り＋攻め）" in df["シナリオ"].values
+    assert "全ハズレ" in df["シナリオ"].values
 
 
 def test_html_decode_charset():

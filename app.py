@@ -55,7 +55,7 @@ from core.auth import (
 
 st.set_page_config(
     page_title="kurone no asobiba",
-    page_icon="🐾",
+    
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -281,16 +281,16 @@ def update_entries_from_df(race: RaceInfo, df: pd.DataFrame):
 
 def render_phase1():
     st.markdown('<span class="header-badge">フェーズ1</span>', unsafe_allow_html=True)
-    st.title("🏇 レース選択 ＆ 出馬表確認")
+    st.title("レース選択・出馬表確認")
     st.markdown(
         "シミュレーションの対象となるレースを選択し、出馬表やオッズを確認・調整してください。"
         "選択後、最下部のボタンからシミュレーションへ進みます。"
     )
 
     tab_source_a, tab_source_b, tab_source_c = st.tabs([
-        "📅 タブA：当月の開催レース一覧（推奨）",
-        "🔗 タブB：URL・レースIDから単発取得",
-        "📋 タブC：出馬表テキスト貼り付け取込 / CSV",
+        "タブA：当月の開催レース一覧（推奨）",
+        "タブB：URL・レースIDから単発取得",
+        "タブC：出馬表テキスト貼り付け取込 / CSV",
     ])
 
     # --------------------------------------------------------------------------
@@ -303,7 +303,7 @@ def render_phase1():
                 f"**現在保持しているレース一覧**（最終更新: `{st.session_state.monthly_races_fetched_at}`）"
             )
         with col_ctrl2:
-            if st.button("🔄 レース一覧を手動更新", use_container_width=True):
+            if st.button("レース一覧を手動更新", use_container_width=True):
                 with st.spinner("当月のレース一覧をオンデマンド取得中..."):
                     st.session_state.monthly_races = fetch_monthly_race_list()
                     st.session_state.monthly_races_fetched_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -360,7 +360,7 @@ def render_phase1():
             value="https://race.netkeiba.com/race/shutuba.html?race_id=202608050611",
             placeholder="https://race.netkeiba.com/race/shutuba.html?race_id=...",
         )
-        if st.button("📥 このレースの詳細を手動取得", use_container_width=True):
+        if st.button("このレースの詳細を手動取得", use_container_width=True):
             with st.spinner("指定されたレースの出馬表を取得中..."):
                 r_info = fetch_shutuba_by_url(input_url)
                 st.session_state.loaded_race_details[r_info.race_id] = r_info
@@ -382,7 +382,7 @@ def render_phase1():
         )
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
-            if st.button("📋 貼り付けテキストを解析して取り込む", use_container_width=True):
+            if st.button("貼り付けテキストを解析して取り込む", use_container_width=True):
                 try:
                     parsed_race = parse_pasted_shutuba_text(pasted_text)
                     st.session_state.loaded_race_details[parsed_race.race_id] = parsed_race
@@ -419,7 +419,7 @@ def render_phase1():
     col_start1, col_start2 = st.columns(2)
     with col_start1:
         if st.button(
-            "🚀 このレースでシミュレーションを開始する",
+            "このレースでシミュレーションを開始する",
             type="primary",
             use_container_width=True,
         ):
@@ -427,7 +427,7 @@ def render_phase1():
             st.rerun()
     with col_start2:
         if st.button(
-            "⚡ サンプル買い目付きでシミュレーションを開始する",
+            "サンプル買い目付きでシミュレーションを開始する",
             use_container_width=True,
         ):
             _setup_sample_bets(st.session_state.current_race)
@@ -443,15 +443,15 @@ def render_shutuba_fragment():
     head_col1, head_col2 = st.columns([3, 1])
     with head_col1:
         st.subheader(
-            f"📋 {current_race.venue}{current_race.race_number}R {current_race.race_name} ({current_race.grade})"
+            f"{current_race.venue}{current_race.race_number}R {current_race.race_name} ({current_race.grade})"
         )
         st.caption(
-            f"📅 開催日: {current_race.date} | コース: {current_race.surface} {current_race.distance}m | "
+            f"開催日: {current_race.date} | コース: {current_race.surface} {current_race.distance}m | "
             f"馬場: {current_race.track_condition} | 発走: {current_race.departure_time} | "
             f"最終取得: {current_race.fetched_at or '不明'}"
         )
     with head_col2:
-        if st.button("🔄 この出馬表・オッズを再取得", use_container_width=True):
+        if st.button("この出馬表・オッズを再取得", use_container_width=True):
             with st.spinner("出馬表を再取得中..."):
                 if current_race.source_url and current_race.source_url.startswith("http"):
                     refreshed = fetch_shutuba_by_url(current_race.source_url, current_race.race_id)
@@ -562,12 +562,12 @@ def render_phase2():
         st.subheader(f"{current_race.race_name}")
         st.caption(f"{current_race.date} / {current_race.surface} {current_race.distance}m")
 
-        if st.button("🔄 別のレースを選び直す", use_container_width=True):
+        if st.button("別のレースを選び直す", use_container_width=True):
             st.session_state.simulation_started = False
             st.rerun()
 
         st.markdown("---")
-        st.subheader("⚙️ 資金配分パラメータ")
+        st.subheader("資金配分パラメータ")
 
         # 総予算 (数値入力＋スライダー連動、100円単位、デフォルト10,000円)
         st.markdown("**総予算 (円・100円単位)**")
@@ -661,7 +661,7 @@ def render_phase2():
         st.session_state.sim_config.synthetic_odds_threshold = float(syn_thresh)
 
         st.markdown("---")
-        st.subheader("💾 データ入出力 (CSV / JSON)")
+        st.subheader("データ入出力 (CSV / JSON)")
 
         # エクスポート
         if st.session_state.bets:
@@ -669,7 +669,7 @@ def render_phase2():
             with col_exp1:
                 csv_data = export_bets_to_csv(st.session_state.bets)
                 st.download_button(
-                    label="📥 買い目CSV",
+                    label="買い目CSV",
                     data=csv_data,
                     file_name=f"bets_{current_race.race_id}.csv",
                     mime="text/csv",
@@ -682,7 +682,7 @@ def render_phase2():
                     "bets": [b.to_dict() for b in st.session_state.bets],
                 }, ensure_ascii=False, indent=2)
                 st.download_button(
-                    label="📦 全体JSON",
+                    label="全体JSON",
                     data=portfolio_dump,
                     file_name=f"portfolio_{current_race.race_id}.json",
                     mime="application/json",
@@ -746,13 +746,13 @@ def render_bet_management_fragment():
     current_race: RaceInfo = st.session_state.current_race
 
     st.markdown('<span class="header-badge">STEP 1</span>', unsafe_allow_html=True)
-    st.subheader("🎯 買い目の構築 ＆ オッズ設定")
+    st.subheader("買い目の構築・オッズ設定")
 
     # 出馬表折りたたみ参照
-    with st.expander("👀 このレースの出馬表・オッズ・予想印を確認する", expanded=False):
+    with st.expander("このレースの出馬表・オッズ・予想印を確認する", expanded=False):
         st.dataframe(entries_to_df(current_race.entries), use_container_width=True, hide_index=True)
 
-    tab_create, tab_edit = st.tabs(["➕ フォーメーション・ボックスで買い目を追加", "✏️ 買い目一覧・オッズ・役割の編集"])
+    tab_create, tab_edit = st.tabs(["フォーメーション・ボックスで買い目を追加", "買い目一覧・オッズ・役割の編集"])
 
     # 選択肢用ラベル作成 (例: "1: ホーエリート (42.5倍 / 無)")
     horse_options = {}
@@ -801,7 +801,7 @@ def render_bet_management_fragment():
 
         col_btn1, col_btn2, col_btn3 = st.columns([2, 2, 2])
         with col_btn1:
-            if st.button("➕ フォーメーションを展開して追加", type="primary", use_container_width=True):
+            if st.button("フォーメーションを展開して追加", type="primary", use_container_width=True):
                 new_combs = generate_formation_bets(ticket_type, h_first, h_second, h_third)
                 _append_combinations(new_combs, ticket_type, bet_role, current_race)
                 st.success(f"{len(new_combs)}点の買い目を追加しました！")
@@ -809,14 +809,14 @@ def render_bet_management_fragment():
 
         with col_btn2:
             if ticket_type not in (TicketType.WIN, TicketType.PLACE):
-                if st.button("📦 1頭目候補の馬番でボックス展開", use_container_width=True):
+                if st.button("1頭目候補の馬番でボックス展開", use_container_width=True):
                     new_combs = generate_box_bets(ticket_type, h_first)
                     _append_combinations(new_combs, ticket_type, bet_role, current_race)
                     st.success(f"{len(new_combs)}点のボックス買い目を追加しました！")
                     st.rerun()
 
         with col_btn3:
-            if st.button("🪄 印（◎○▲△）から推奨買い目を自動追加", use_container_width=True):
+            if st.button("印（◎○▲△）から推奨買い目を自動追加", use_container_width=True):
                 _auto_generate_from_marks(current_race)
                 st.success("推奨買い目を自動展開しました！")
                 st.rerun()
@@ -832,7 +832,7 @@ def render_bet_management_fragment():
             with col_ed_ctrl1:
                 st.markdown(f"現在 **{len(st.session_state.bets)}点** の買い目が登録されています。")
             with col_ed_ctrl2:
-                if st.button("🗑️ 全買い目をクリア", use_container_width=True):
+                if st.button("全買い目をクリア", use_container_width=True):
                     st.session_state.bets = []
                     st.rerun()
 
@@ -982,7 +982,7 @@ def _auto_generate_from_marks(race: RaceInfo):
 def render_allocation_dashboard_fragment():
     """リアルタイム配分計算＆ダッシュボード"""
     st.markdown('<span class="header-badge">STEP 2</span>', unsafe_allow_html=True)
-    st.subheader("📊 リアルタイム資金配分 ＆ リスク分析ダッシュボード")
+    st.subheader("リアルタイム資金配分・リスク分析ダッシュボード")
 
     if not st.session_state.bets:
         st.info("買い目を1点以上登録すると、最適な資金配分が自動計算されます。")
@@ -994,12 +994,12 @@ def render_allocation_dashboard_fragment():
     # アラートバナー
     if alloc_res.is_bankrupt:
         st.markdown(
-            f'<div class="da-alert-error"><strong>❌ [エラー: 予算超過・破綻]</strong> {alloc_res.error_message}</div>',
+            f'<div class="da-alert-error"><strong>[エラー: 予算超過・破綻]</strong> {alloc_res.error_message}</div>',
             unsafe_allow_html=True,
         )
     for warn in alloc_res.warnings:
         st.markdown(
-            f'<div class="da-alert-warning"><strong>⚠️ [警告]</strong> {warn}</div>',
+            f'<div class="da-alert-warning"><strong>[警告]</strong> {warn}</div>',
             unsafe_allow_html=True,
         )
 
@@ -1054,12 +1054,12 @@ def render_allocation_dashboard_fragment():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # 配分結果テーブル
-    st.markdown("##### 📋 各買い目の最適配分結果")
+    st.markdown("##### 各買い目の最適配分結果")
     res_rows = []
     for b in alloc_res.bets:
         net_profit_min = b.expected_payout_min - alloc_res.total_invested if b.allocated_amount > 0 else 0
-        role_str = "🛡️ 守り" if b.role == BetRole.DEFENSE else "⚔️ 攻め"
-        torigami_str = "⚠️ トリガミ" if b.is_torigami and b.allocated_amount > 0 else ("的中プラス" if b.allocated_amount > 0 else "配分なし")
+        role_str = "守り" if b.role == BetRole.DEFENSE else "攻め"
+        torigami_str = "トリガミ" if b.is_torigami and b.allocated_amount > 0 else ("的中プラス" if b.allocated_amount > 0 else "配分なし")
 
         odds_str = f"{b.odds_min:.1f}" if b.odds_max is None or b.odds_min == b.odds_max else f"{b.odds_min:.1f}〜{b.odds_max:.1f}"
 
@@ -1081,7 +1081,7 @@ def render_allocation_dashboard_fragment():
     col_chart, col_matrix = st.columns([1, 1])
 
     with col_chart:
-        st.markdown("##### 📈 各買い目 単独的中時の純利益分布")
+        st.markdown("##### 各買い目 単独的中時の純利益分布")
         labels = [f"{b.ticket_type.value}:{b.combination}" for b in alloc_res.bets]
         profits = [
             (b.expected_payout_min - alloc_res.total_invested) if b.allocated_amount > 0 else 0
@@ -1121,7 +1121,7 @@ def render_allocation_dashboard_fragment():
         st.plotly_chart(fig, use_container_width=True)
 
     with col_matrix:
-        st.markdown("##### 🎯 4シナリオ別 損益マトリクス")
+        st.markdown("##### 4シナリオ別 損益マトリクス")
         df_scenarios = generate_scenario_matrix(alloc_res.bets)
         st.dataframe(df_scenarios, use_container_width=True, hide_index=True)
 
@@ -1136,7 +1136,7 @@ def render_simulation_panel_fragment():
     current_race: RaceInfo = st.session_state.current_race
 
     st.markdown('<span class="header-badge">STEP 3</span>', unsafe_allow_html=True)
-    st.subheader("🏁 着順シミュレーション ＆ 結果検証")
+    st.subheader("着順シミュレーション・結果検証")
     st.markdown("仮想の確定着順（1〜3着）を選択し、複数的中や最終的な払戻・回収率を即座にシミュレーションします。")
 
     if not st.session_state.bets:
@@ -1153,20 +1153,20 @@ def render_simulation_panel_fragment():
 
     c_sim1, c_sim2, c_sim3 = st.columns(3)
     with c_sim1:
-        sel_1 = st.selectbox("🥇 1着 馬番", labels_list, index=0)
+        sel_1 = st.selectbox("1着 馬番", labels_list, index=0)
     with c_sim2:
         idx_2 = 1 if len(labels_list) > 1 else 0
-        sel_2 = st.selectbox("🥈 2着 馬番", labels_list, index=idx_2)
+        sel_2 = st.selectbox("2着 馬番", labels_list, index=idx_2)
     with c_sim3:
         idx_3 = 2 if len(labels_list) > 2 else 0
-        sel_3 = st.selectbox("🥉 3着 馬番", labels_list, index=idx_3)
+        sel_3 = st.selectbox("3着 馬番", labels_list, index=idx_3)
 
     first = options_dict[sel_1]
     second = options_dict[sel_2]
     third = options_dict[sel_3]
 
     if len({first, second, third}) < 3:
-        st.warning("⚠️ 1着、2着、3着には異なる馬番を選択してください。")
+        st.warning("1着、2着、3着には異なる馬番を選択してください。")
         return
 
     # シミュレーション評価
@@ -1176,7 +1176,7 @@ def render_simulation_panel_fragment():
     if eval_res.is_hit:
         status_bg = "#E6F5EC" if eval_res.net_profit_min >= 0 else "#FFF9E6"
         status_border = "#259D63" if eval_res.net_profit_min >= 0 else "#B78F00"
-        status_text = "🎉 的中！プラス収支" if eval_res.net_profit_min >= 0 else "⚠️ 的中しましたがトリガミです"
+        status_text = "的中（プラス収支）" if eval_res.net_profit_min >= 0 else "的中（トリガミ）"
 
         st.markdown(
             f"""
@@ -1197,13 +1197,13 @@ def render_simulation_panel_fragment():
             unsafe_allow_html=True,
         )
 
-        st.markdown("##### 🎯 的中した買い目一覧")
+        st.markdown("##### 的中した買い目一覧")
         hit_rows = []
         for h in eval_res.hit_bets:
             hit_rows.append({
                 "券種": h.bet.ticket_type.value if hasattr(h.bet.ticket_type, "value") else h.bet.ticket_type,
                 "買い目": h.bet.combination,
-                "役割": "🛡️ 守り" if h.bet.role == BetRole.DEFENSE else "⚔️ 攻め",
+                "役割": "守り" if h.bet.role == BetRole.DEFENSE else "攻め",
                 "購入額": f"{h.bet.allocated_amount:,}円",
                 "払戻金": f"{h.payout_min:,.0f}円 〜 {h.payout_max:,.0f}円" if h.payout_min != h.payout_max else f"{h.payout_min:,.0f}円",
                 "獲得利益": f"{h.profit_min:+,.0f}円",
@@ -1214,7 +1214,7 @@ def render_simulation_panel_fragment():
         st.markdown(
             f"""
             <div style="background-color: #FDECEC; border: 2px solid #EC0000; border-radius: 8px; padding: 18px; margin: 15px 0;">
-                <h4 style="margin: 0 0 10px 0; color: #EC0000;">💀 不的中 (全ハズレ)</h4>
+                <h4 style="margin: 0 0 10px 0; color: #EC0000;">不的中 (全ハズレ)</h4>
                 確定着順: <strong>1着 {first}番 / 2着 {second}番 / 3着 {third}番</strong><br>
                 合計投資額: <strong>{eval_res.total_invested:,} 円</strong><br>
                 払戻金: <strong>0 円</strong><br>
@@ -1241,7 +1241,7 @@ def render_login_page():
         st.markdown(
             """
             <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
-                <h1 style="font-size: 2.2rem; margin-bottom: 8px;">🐾 kurone no asobiba</h1>
+                <h1 style="font-size: 2.2rem; margin-bottom: 8px;">kurone no asobiba</h1>
                 <p style="color: #64748B; font-size: 0.95rem;">Private Member Portal & Workspace</p>
             </div>
             """,
@@ -1249,21 +1249,21 @@ def render_login_page():
         )
 
         with st.form("login_form", clear_on_submit=False):
-            st.markdown("##### 🔑 ログイン")
+            st.markdown("##### ログイン")
             username = st.text_input("ユーザー名", placeholder="ユーザー名を入力してください")
             password = st.text_input("パスワード", type="password", placeholder="パスワードを入力してください")
             submit = st.form_submit_button("ログイン", use_container_width=True)
 
             if submit:
                 if not username.strip() or not password:
-                    st.error("⚠️ ユーザー名とパスワードを入力してください。")
+                    st.error("ユーザー名とパスワードを入力してください。")
                 elif verify_user(username.strip(), password):
                     st.session_state.is_authenticated = True
                     st.session_state.auth_username = username.strip()
-                    st.success("✅ 認証に成功しました。読み込み中...")
+                    st.success("認証に成功しました。読み込み中...")
                     st.rerun()
                 else:
-                    st.error("❌ ユーザー名またはパスワードが一致しません。")
+                    st.error("ユーザー名またはパスワードが一致しません。")
 
         st.markdown(
             """
@@ -1287,7 +1287,7 @@ def render_user_management_page():
         """
         <div style="margin-bottom: 24px;">
             <div class="header-badge">ADMINISTRATION</div>
-            <h1 style="font-size: 2rem; margin: 0 0 8px 0; color: #1A1A1C;">👥 ユーザー管理</h1>
+            <h1 style="font-size: 2rem; margin: 0 0 8px 0; color: #1A1A1C;">ユーザー管理</h1>
             <p style="color: #53565A; margin: 0;">アプリを利用可能なユーザーの追加・削除・一覧確認を行います。</p>
         </div>
         """,
@@ -1297,7 +1297,7 @@ def render_user_management_page():
     col1, col2 = st.columns([1.2, 1])
 
     with col1:
-        st.markdown("### 📋 登録済みユーザー一覧")
+        st.markdown("### 登録済みユーザー一覧")
         users = get_all_users()
         if users:
             df_users = pd.DataFrame(users)
@@ -1307,11 +1307,11 @@ def render_user_management_page():
             st.info("登録されているユーザーはいません。")
 
         st.markdown("---")
-        st.markdown("### 🗑️ ユーザー削除")
+        st.markdown("### ユーザー削除")
         user_list = [u["username"] for u in users if u["username"] != "kurone" and u["username"] != st.session_state.auth_username]
         if user_list:
             selected_user_to_delete = st.selectbox("削除するユーザーを選択してください", user_list)
-            if st.button("❌ このユーザーを削除する", type="secondary"):
+            if st.button("このユーザーを削除する", type="secondary"):
                 if delete_user(selected_user_to_delete):
                     st.success(f"ユーザー「{selected_user_to_delete}」を削除しました。")
                     st.rerun()
@@ -1321,27 +1321,27 @@ def render_user_management_page():
             st.caption("※削除可能な追加ユーザーは現在いません（管理者 kurone および現在ログイン中のアカウントは保護されています）。")
 
     with col2:
-        st.markdown("### ➕ 新規ユーザー追加")
+        st.markdown("### 新規ユーザー追加")
         with st.form("admin_add_user_form", clear_on_submit=True):
             new_user = st.text_input("新規ユーザー名", placeholder="半角英数字を推奨")
             new_pw = st.text_input("パスワード", type="password", placeholder="4文字以上")
             new_pw_confirm = st.text_input("パスワード（確認用）", type="password", placeholder="もう一度入力してください")
-            submit_add = st.form_submit_button("➕ ユーザーを登録する", use_container_width=True)
+            submit_add = st.form_submit_button("ユーザーを登録する", use_container_width=True)
 
             if submit_add:
                 if not new_user.strip() or not new_pw:
-                    st.error("⚠️ ユーザー名とパスワードを入力してください。")
+                    st.error("ユーザー名とパスワードを入力してください。")
                 elif new_pw != new_pw_confirm:
-                    st.error("⚠️ 確認用パスワードが一致しません。")
+                    st.error("確認用パスワードが一致しません。")
                 elif len(new_pw) < 4:
-                    st.error("⚠️ パスワードは4文字以上で設定してください。")
+                    st.error("パスワードは4文字以上で設定してください。")
                 else:
                     success = add_user(new_user.strip(), new_pw)
                     if success:
-                        st.success(f"🎉 新規ユーザー「{new_user.strip()}」を登録しました！")
+                        st.success(f"新規ユーザー「{new_user.strip()}」を登録しました。")
                         st.rerun()
                     else:
-                        st.error("❌ このユーザー名は既に使用されています。別のユーザー名をお試しください。")
+                        st.error("このユーザー名は既に使用されています。別のユーザー名をお試しください。")
 
 
 # ==============================================================================
@@ -1355,12 +1355,12 @@ def main():
 
     # 認証済みの場合、サイドバー上部にユーザー情報、ログアウトボタン、ナビゲーションを設置
     with st.sidebar:
-        st.markdown("### 🐾 kurone no asobiba")
+        st.markdown("### kurone no asobiba")
         col_u, col_b = st.columns([1.2, 1])
         with col_u:
-            st.caption(f"👤 **{st.session_state.auth_username}**")
+            st.caption(f"ユーザー: **{st.session_state.auth_username}**")
         with col_b:
-            if st.button("🚪 ログアウト", use_container_width=True):
+            if st.button("ログアウト", use_container_width=True):
                 st.session_state.is_authenticated = False
                 st.session_state.auth_username = None
                 st.rerun()
@@ -1368,14 +1368,14 @@ def main():
         st.divider()
 
         app_mode = st.radio(
-            "📌 メニュー選択",
-            ["🏇 シミュレーター", "👥 ユーザー管理"],
+            "メニュー選択",
+            ["シミュレーター", "ユーザー管理"],
             index=0,
             key="app_navigation_mode"
         )
         st.divider()
 
-    if app_mode == "👥 ユーザー管理":
+    if app_mode == "ユーザー管理":
         render_user_management_page()
     else:
         if not st.session_state.simulation_started:
