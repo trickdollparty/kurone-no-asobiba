@@ -8,6 +8,7 @@
 """
 from typing import List, Optional, Tuple, Dict, Any
 import copy
+import numpy as np
 
 from .models import (
     RaceInfo,
@@ -25,6 +26,77 @@ from .combinatorics import (
 )
 from .race_data import estimate_composite_odds
 from .allocator import allocate_funds
+
+
+def build_gemini_argon_portfolio(
+    race: RaceInfo,
+    config: SimulationConfig,
+    honmei: int,
+    taikou: int,
+    tanana: int,
+    osae_cands: List[int],
+) -> List[SingleBet]:
+    """Gemini Argon推奨のプロフェッショナル戦略買い目を構築
+
+    1. リスクヘッジ枠（守り枠）:
+       - どの1点が的中しても単体で総予算100%以上を全額回収する多重網
+       - 馬連（本命-対抗、本命-単穴、本命-押さえ）およびワイド
+    2. 攻め枠（三連単4点）:
+       - 1着: 本命（◎）
+       - 2着: 対抗（○）、単穴（▲）、先行押さえ（△1）
+       - 3着: 穴馬（☆）を据えた10万円超え払戻狙い（2点）
+       - 3着: 有力馬同士の中配当狙い（2点）
+       - ※配分時に少なくとも1点は払戻が10万円を超えるように自動配分される
+    """
+    if not race.entries:
+        return []
+
+    osae1 = osae_cands[0] if len(osae_cands) > 0 else taikou
+    osae2 = osae_cands[1] if len(osae_cands) > 1 else osae1
+
+    # 穴馬の選定 (単勝人気6〜8位、または☆印の馬)
+    ana_cands = [h for h in osae_cands if h not in (taikou, tanana, osae1, osae2)]
+    ana = ana_cands[0] if ana_cands else (osae_cands[-1] if osae_cands else osae2)
+
+    # 守り枠の候補 (馬連およびワイド)
+    defense_candidates = [
+        ([honmei, taikou], TicketType.QUINELLA),  # 2強本線馬連
+        ([honmei, tanana], TicketType.QUINELLA),  # 3番人気馬連
+        ([honmei, osae2], TicketType.QUINELLA),   # 押さえ馬連 (中穴)
+        ([honmei, osae1], TicketType.WIDE),       # ワイド (3着粘り込みケア)
+    ]
+
+    max_defense_budget = int(config.total_budget * 0.65)
+    cur_defense_cost = 0
+    bets: List[SingleBet] = []
+
+    for pair, t_type in defense_candidates:
+        if len(set(pair)) < 2:
+            continue
+        o_min, o_max = estimate_composite_odds(t_type, pair, race.entries)
+        needed = int(np.ceil(config.total_budget / (max(o_min, 1.1) * 100.0))) * 100
+        # 守り枠予算枠内、または最低2点確保
+        if cur_defense_cost + needed <= max_defense_budget or len(bets) < 2:
+            comb = f"{min(pair)}-{max(pair)}"
+            if not any(b.combination == comb and b.ticket_type == t_type for b in bets):
+                bets.append(SingleBet(t_type, comb, o_min, o_max, BetRole.DEFENSE))
+                cur_defense_cost += needed
+
+    # 攻め枠（三連単4点）
+    trifectas = [
+        [honmei, taikou, ana],    # 10万超え狙い（本線穴）
+        [honmei, osae1, ana],     # 10万超え狙い（内枠・先行穴）
+        [honmei, taikou, osae1],  # 中配当狙い（王道決着）
+        [honmei, osae1, taikou],  # 中配当狙い（先行粘り）
+    ]
+    for tri in trifectas:
+        if len(set(tri)) == 3:
+            o_min, _ = estimate_composite_odds(TicketType.TRIFECTA, tri, race.entries)
+            comb = f"{tri[0]}-{tri[1]}-{tri[2]}"
+            if not any(b.combination == comb and b.ticket_type == TicketType.TRIFECTA for b in bets):
+                bets.append(SingleBet(TicketType.TRIFECTA, comb, o_min, None, BetRole.OFFENSE))
+
+    return bets
 
 
 def optimize_bets_from_marks(
@@ -104,6 +176,40 @@ def optimize_bets_from_marks(
     best_iter = 0
 
     iteration = 0
+
+    # --------------------------------------------------------------------------
+    # ★ 最優先パターン: Gemini Argon推奨のプロフェッショナル戦略
+    # (元本回収の多重網 + 10万円超え三連単フォーメーション)
+    # --------------------------------------------------------------------------
+    gemini_bets = build_gemini_argon_portfolio(race, config, honmei, taikou, tanana, osae_cands)
+    if gemini_bets:
+        iteration += 1
+        alloc_gemini = allocate_funds(gemini_bets, config)
+        torigami_c = sum(1 for b in alloc_gemini.bets if b.is_torigami and b.allocated_amount > 0)
+        warn_c = len(alloc_gemini.warnings)
+        syn_short = max(0.0, config.synthetic_odds_threshold - alloc_gemini.synthetic_odds)
+
+        # 10万円超え三連単が存在するか確認
+        has_100k_trifecta = any(
+            (b.allocated_amount * b.odds_min) >= 100000.0 and b.ticket_type == TicketType.TRIFECTA
+            for b in alloc_gemini.bets
+        )
+        # 警告ゼロ・トリガミゼロ・破綻なしの場合、かつ10万円超え達成なら即採用
+        if not alloc_gemini.is_bankrupt and torigami_c == 0 and warn_c == 0:
+            return gemini_bets, None, iteration
+
+        # ベスト候補として初期登録
+        best_penalty = (
+            (100000.0 if alloc_gemini.is_bankrupt else 0.0)
+            + (torigami_c * 200.0)
+            + (syn_short * 150.0)
+            + (warn_c * 50.0)
+            - (500.0 if has_100k_trifecta else 0.0)
+        )
+        best_bets = gemini_bets
+        best_res = alloc_gemini
+        best_iter = iteration
+
     # 探索グリッド実行（最大100回）
     for d_idx, (d_type, _) in enumerate(defense_patterns):
         for o_idx, o_conf in enumerate(offense_patterns):

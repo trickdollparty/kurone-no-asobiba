@@ -1155,9 +1155,9 @@ def render_bet_management_fragment():
                     st.rerun()
 
         with col_btn3:
-            if st.button("印（◎○▲△）から推奨買い目を自動追加", use_container_width=True):
+            if st.button("印から推奨買い目を自動追加（元本回収網＋10万超三連単）", use_container_width=True):
                 _auto_generate_from_marks(current_race)
-                st.success(f"{len(st.session_state.bets)}点の推奨買い目を自動追加しました！")
+                st.success(f"{len(st.session_state.bets)}点の推奨買い目を自動追加しました！（元本回収多重網＋10万円超え三連単）")
                 st.rerun()
 
     # --------------------------------------------------------------------------

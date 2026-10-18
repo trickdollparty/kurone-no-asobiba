@@ -163,10 +163,51 @@ def _allocate_hybrid(
                 bets[idx].allocated_amount = config.min_bet_unit
             remaining_budget -= min_offense_needed
 
-            # 攻め枠への傾斜理論配分（または均等）
+            # ------------------------------------------------------------------
+            # ★ 10万円超え三連単ターゲット優先配分
+            # 攻め枠に三連単または高オッズ(>=50倍)がある場合、少なくとも1点は払戻10万円超えを狙う
+            # ------------------------------------------------------------------
+            target_100k_payout = 100000.0
+
+            def _score_100k_target(i: int) -> float:
+                odds = bets[i].odds_min
+                # 60倍〜160倍が最も理想的（少ない金額 700〜1,600円 で10万円超え可能）
+                if 60.0 <= odds <= 160.0:
+                    return 0.0 + odds
+                elif odds > 160.0:
+                    return 200.0 + odds
+                else:
+                    return 500.0 - odds
+
+            high_odds_indices = [
+                i for i in offense_indices
+                if bets[i].odds_min >= 40.0
+            ]
+            # 最も効率よく10万円超えを狙える買い目を優先
+            high_odds_indices.sort(key=_score_100k_target)
+
+            allocated_100k_count = 0
+            for idx in high_odds_indices:
+                b = bets[idx]
+                target_total = int(np.ceil(target_100k_payout / (b.odds_min * 100.0))) * 100
+                add_needed = max(0, target_total - b.allocated_amount)
+                # 残り予算から割り当て可能か確認
+                if add_needed > 0 and remaining_budget >= add_needed:
+                    b.allocated_amount += add_needed
+                    remaining_budget -= add_needed
+                    allocated_100k_count += 1
+                    # 最大2点まで10万円超えを確保（それ以上は中配当や余剰配分に回す）
+                    if allocated_100k_count >= 2:
+                        break
+
+            # 残余予算の攻め枠傾斜理論配分（まだ10万超えになっていない、または全攻め枠）
             if remaining_budget >= config.min_bet_unit:
-                offense_odds = np.array([bets[i].odds_min for i in offense_indices], dtype=float)
-                # オッズ逆数による傾斜（均等払戻に近い配分）
+                # 10万超え未達成の枠、または全攻め枠へ傾斜
+                target_offense_indices = [i for i in offense_indices if (bets[i].allocated_amount * bets[i].odds_min) < target_100k_payout]
+                if not target_offense_indices:
+                    target_offense_indices = offense_indices
+
+                offense_odds = np.array([bets[i].odds_min for i in target_offense_indices], dtype=float)
                 reciprocals = 1.0 / offense_odds
                 total_recip = np.sum(reciprocals)
                 if total_recip > 0:
@@ -174,7 +215,7 @@ def _allocate_hybrid(
                     raw_additional = remaining_budget * raw_proportions
                     floor_additional = (np.floor(raw_additional / 100.0) * 100).astype(int)
 
-                    for i, idx in enumerate(offense_indices):
+                    for i, idx in enumerate(target_offense_indices):
                         add_amt = floor_additional[i]
                         bets[idx].allocated_amount += add_amt
                         remaining_budget -= add_amt
