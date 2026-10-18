@@ -49,7 +49,7 @@ def test_optimizer_zero_warnings():
     config = SimulationConfig(
         total_budget=10000,
         strategy_mode=StrategyMode.HYBRID,
-        synthetic_odds_threshold=4.0,
+        synthetic_odds_threshold=2.5,
     )
     bets, proposal, iters = optimize_bets_from_marks(preset, config, max_iterations=100)
 
@@ -76,3 +76,25 @@ def test_optimizer_fallback_proposal():
     assert "suggested_threshold" in proposal
     assert proposal["additional_budget"] >= 1000
     assert proposal["suggested_threshold"] > 0
+
+
+def test_optimizer_with_no_marks_at_all():
+    """印がすべて「無」の場合でも、人気順から自動補完して買い目が複数点生成されることの検証"""
+    preset = get_preset_races()[0]
+    # 印をすべて「無」にする
+    for e in preset.entries:
+        e.mark = "無"
+
+    config = SimulationConfig(
+        total_budget=10000,
+        strategy_mode=StrategyMode.HYBRID,
+        synthetic_odds_threshold=2.5,
+    )
+    bets, proposal, iters = optimize_bets_from_marks(preset, config, max_iterations=100)
+
+    assert len(bets) >= 3
+    # 守り枠と攻め枠の両方が存在すること
+    has_defense = any(b.role.value == "defense" for b in bets)
+    has_offense = any(b.role.value == "offense" for b in bets)
+    assert has_defense
+    assert has_offense

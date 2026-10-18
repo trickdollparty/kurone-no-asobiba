@@ -1157,6 +1157,7 @@ def render_bet_management_fragment():
         with col_btn3:
             if st.button("印（◎○▲△）から推奨買い目を自動追加", use_container_width=True):
                 _auto_generate_from_marks(current_race)
+                st.success(f"{len(st.session_state.bets)}点の推奨買い目を自動追加しました！")
                 st.rerun()
 
     # --------------------------------------------------------------------------
@@ -1281,6 +1282,14 @@ def _append_combinations(
 
 def _auto_generate_from_marks(race: RaceInfo):
     """印（◎○▲△☆）から警告ゼロを目指し最大100回試行して最適な買い目を自動選定"""
+    # もし印がすべて「無」の場合は、オッズ・人気順で印を自動補完
+    if all(e.mark == "無" for e in race.entries):
+        sorted_by_pop = sorted(race.entries, key=lambda x: (x.win_odds, x.popularity))
+        mark_assignment = ["◎", "○", "▲", "△", "△", "☆"]
+        for i, e in enumerate(sorted_by_pop):
+            if i < len(mark_assignment):
+                e.mark = mark_assignment[i]
+
     with st.spinner("警告（トリガミ・合成オッズ閾値割れ）ゼロを目指し最大100回最適化探索中..."):
         best_bets, proposal, iters = optimize_bets_from_marks(
             race,

@@ -381,6 +381,13 @@ def parse_pasted_shutuba_text(raw_text: str) -> RaceInfo:
         if e.popularity == 99 or e.popularity > len(entries):
             e.popularity = i + 1
 
+    # 印が未設定（すべて「無」）の場合はオッズ・人気順で初期付与
+    if all(e.mark == "無" for e in entries):
+        mark_assignment = ["◎", "○", "▲", "△", "△", "☆"]
+        for i, e in enumerate(sorted_by_odds):
+            if i < len(mark_assignment):
+                e.mark = mark_assignment[i]
+
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     race_id = f"custom_{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
@@ -1033,6 +1040,15 @@ def fetch_shutuba_by_url(url: str, race_id: Optional[str] = None) -> RaceInfo:
                 popularity=pop_val,
             )
         )
+
+    # 単勝オッズ・人気順に基づいてデフォルトの予想印を自動付与
+    sorted_by_pop = sorted(entries, key=lambda x: (x.win_odds, x.popularity))
+    mark_assignment = ["◎", "○", "▲", "△", "△", "☆"]
+    for i, e in enumerate(sorted_by_pop):
+        if i < len(mark_assignment):
+            e.mark = mark_assignment[i]
+        else:
+            e.mark = "無"
 
     # 馬番昇順ソート
     entries.sort(key=lambda x: x.horse_number)

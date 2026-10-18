@@ -59,8 +59,12 @@ def optimize_bets_from_marks(
     tanana = tanana_cands[0] if tanana_cands else (all_horse_nums[2] if len(all_horse_nums) > 2 else taikou)
 
     osae_cands = [h for h in (mark_horses["△"] + mark_horses["☆"]) if h not in (honmei, taikou, tanana)]
-    if not osae_cands and len(all_horse_nums) > 3:
-        osae_cands = all_horse_nums[3:7]
+    # 押さえ候補が少なければ人気上位から補充（常に5頭程度確保）
+    for h in all_horse_nums:
+        if h not in (honmei, taikou, tanana) and h not in osae_cands:
+            osae_cands.append(h)
+        if len(osae_cands) >= 5:
+            break
 
     # 探索バリエーションの生成定義 (最大100パターン)
     # 守り枠のバリエーション (6通り)
@@ -139,7 +143,7 @@ def optimize_bets_from_marks(
             # 2. 攻め枠の構築
             if o_conf["type"] == "trio_formation":
                 c_second = [taikou, tanana]
-                c_third = ([taikou, tanana] + osae_cands)[:o_conf["third_count"] + 1]
+                c_third = [taikou, tanana] + osae_cands[:o_conf["third_count"]]
                 trio_combs = generate_formation_bets(TicketType.TRIO, [honmei], c_second, c_third)
                 for tc in trio_combs:
                     horses = parse_combination_horses(tc)
@@ -151,7 +155,8 @@ def optimize_bets_from_marks(
 
             elif o_conf["type"] == "nagashi":
                 t_type = o_conf["ticket_type"]
-                opponents = ([taikou, tanana] + osae_cands)[:o_conf["opp_count"]]
+                opponents = [taikou, tanana] + osae_cands[:o_conf["opp_count"]]
+                opponents = [h for h in opponents if h != honmei]
                 for opp in opponents:
                     comb = f"{min(honmei, opp)}-{max(honmei, opp)}"
                     o_min, o_max = estimate_composite_odds(t_type, [honmei, opp], race.entries)
@@ -175,22 +180,38 @@ def optimize_bets_from_marks(
             # 合成オッズ不足幅
             syn_shortfall = max(0.0, config.synthetic_odds_threshold - syn_odds)
 
-            # 完全クリア判定（警告ゼロ、トリガミゼロ、合成オッズ閾値以上、破綻なし）
+            # 買い目のバランス判定 (守り枠と攻め枠が両方存在し、3点以上あること)
+            has_defense = any(b.role == BetRole.DEFENSE for b in candidate_bets)
+            has_offense = any(b.role == BetRole.OFFENSE for b in candidate_bets)
+
+            # 完全クリア判定（警告ゼロ、トリガミゼロ、合成オッズ閾値以上、破綻なし、適切な点数バランス）
             if (
                 not is_bankrupt
                 and syn_shortfall <= 0.001
                 and torigami_count == 0
                 and warnings_count == 0
+                and len(candidate_bets) >= 3
+                and has_defense
+                and has_offense
             ):
                 # 警告ゼロを達成！即座に採用して探索終了
                 return candidate_bets, None, iteration
 
             # ペナルティスコア計算（最善手探索用）
+            balance_penalty = 0.0
+            if len(candidate_bets) < 3:
+                balance_penalty += 1000.0
+            if not has_defense:
+                balance_penalty += 500.0
+            if not has_offense:
+                balance_penalty += 500.0
+
             penalty = (
                 (100000.0 if is_bankrupt else 0.0)
                 + (torigami_count * 200.0)
                 + (syn_shortfall * 150.0)
                 + (warnings_count * 50.0)
+                + balance_penalty
             )
 
             if penalty < best_penalty:
@@ -204,10 +225,19 @@ def optimize_bets_from_marks(
 
     # 100回試行しても完全クリア（警告ゼロ）が見つからなかった場合
     # 最善手を返し、改善提案（必要追加予算 or 合成オッズ閾値引下げ）を生成
-    if not best_bets:
-        # フォールバック
+    if not best_bets or len(best_bets) < 2:
+        # フォールバック (守りワイド2点 + 三連複フォーメーション)
         w_min, w_max = estimate_composite_odds(TicketType.WIDE, [honmei, taikou], race.entries)
-        best_bets = [SingleBet(TicketType.WIDE, f"{min(honmei, taikou)}-{max(honmei, taikou)}", w_min, w_max, BetRole.DEFENSE)]
+        w2_min, w2_max = estimate_composite_odds(TicketType.WIDE, [honmei, tanana], race.entries)
+        best_bets = [
+            SingleBet(TicketType.WIDE, f"{min(honmei, taikou)}-{max(honmei, taikou)}", w_min, w_max, BetRole.DEFENSE),
+            SingleBet(TicketType.WIDE, f"{min(honmei, tanana)}-{max(honmei, tanana)}", w2_min, w2_max, BetRole.DEFENSE),
+        ]
+        trio_cands = generate_formation_bets(TicketType.TRIO, [honmei], [taikou, tanana], [taikou, tanana] + osae_cands[:2])
+        for tc in trio_cands:
+            h = parse_combination_horses(tc)
+            t_min, _ = estimate_composite_odds(TicketType.TRIO, h, race.entries)
+            best_bets.append(SingleBet(TicketType.TRIO, tc, t_min, None, BetRole.OFFENSE))
         best_res = allocate_funds(best_bets, config)
 
     # 提案数値の精密計算
