@@ -51,12 +51,19 @@ def build_gemini_argon_portfolio(
     if not race.entries:
         return []
 
-    osae1 = osae_cands[0] if len(osae_cands) > 0 else taikou
-    osae2 = osae_cands[1] if len(osae_cands) > 1 else osae1
+    # 穴馬の選定 (☆印の馬、または単勝20〜60倍の盲点馬を最優先)
+    star_horses = [e.horse_number for e in race.entries if e.mark == "☆" and e.horse_number != honmei]
+    if star_horses:
+        ana = star_horses[0]
+    else:
+        # 6〜10番人気の中から穴馬候補を探す
+        ana_cands = [h for h in osae_cands if h not in (taikou, tanana)]
+        ana = ana_cands[-1] if len(ana_cands) >= 3 else (ana_cands[0] if ana_cands else osae_cands[-1])
 
-    # 穴馬の選定 (単勝人気6〜8位、または☆印の馬)
-    ana_cands = [h for h in osae_cands if h not in (taikou, tanana, osae1, osae2)]
-    ana = ana_cands[0] if ana_cands else (osae_cands[-1] if osae_cands else osae2)
+    # 押さえ候補 (ana 以外の有力押さえ馬から選定)
+    remaining_osae = [h for h in osae_cands if h != ana and h not in (taikou, tanana)]
+    osae1 = remaining_osae[0] if len(remaining_osae) > 0 else (osae_cands[0] if osae_cands[0] != ana else taikou)
+    osae2 = remaining_osae[1] if len(remaining_osae) > 1 else (remaining_osae[0] if remaining_osae else osae1)
 
     # 守り枠の候補 (馬連およびワイド)
     defense_candidates = [
@@ -82,7 +89,11 @@ def build_gemini_argon_portfolio(
                 bets.append(SingleBet(t_type, comb, o_min, o_max, BetRole.DEFENSE))
                 cur_defense_cost += needed
 
-    # 攻め枠（三連単4点）
+    # 攻め枠（三連単4点）:
+    # 1. 本線穴 (10万超え狙い)
+    # 2. 先行穴 (10万超え狙い)
+    # 3. 王道決着 (中配当)
+    # 4. 先行粘り (中配当)
     trifectas = [
         [honmei, taikou, ana],    # 10万超え狙い（本線穴）
         [honmei, osae1, ana],     # 10万超え狙い（内枠・先行穴）
@@ -194,7 +205,23 @@ def optimize_bets_from_marks(
             (b.allocated_amount * b.odds_min) >= 100000.0 and b.ticket_type == TicketType.TRIFECTA
             for b in alloc_gemini.bets
         )
-        # 警告ゼロ・トリガミゼロ・破綻なしの場合、かつ10万円超え達成なら即採用
+        # 守り枠が的中時に元本100%回収できるか確認 (最低2点以上配分されていること)
+        active_defense = [b for b in alloc_gemini.bets if b.role == BetRole.DEFENSE and b.allocated_amount > 0]
+        defense_ok = len(active_defense) >= 2 and all(
+            (b.allocated_amount * b.odds_min) >= config.total_budget
+            for b in active_defense
+        )
+        # 破綻なし・トリガミゼロ・守り枠回収OK・10万円超え三連単あり・警告ゼロなら最優先即採用！
+        if (
+            not alloc_gemini.is_bankrupt
+            and torigami_c == 0
+            and defense_ok
+            and has_100k_trifecta
+            and warn_c == 0
+        ):
+            return gemini_bets, None, iteration
+
+        # 一般的な警告ゼロ・トリガミゼロ・破綻なしの場合も即採用
         if not alloc_gemini.is_bankrupt and torigami_c == 0 and warn_c == 0:
             return gemini_bets, None, iteration
 

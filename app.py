@@ -419,7 +419,7 @@ def init_session_state():
             strategy_mode=StrategyMode.HYBRID,
             target_recovery_rate=1.0,
             min_bet_unit=100,
-            synthetic_odds_threshold=1.8,
+            synthetic_odds_threshold=1.7,
             surplus_rule="boost_min_payout",
         )
 
@@ -848,10 +848,10 @@ def render_phase2():
             value=float(st.session_state.sim_config.synthetic_odds_threshold),
             step=0.1,
             format="%.2f",
-            help="合成オッズとは「どの買い目が的中しても同等の払戻を得られるよう配分した際の全体の想定オッズ」です。この値を下回ると『的中しても旨味が薄い（薄利多売・資金効率低下）』状態であることを警告します。守り枠（馬連・ワイド）を含むハイブリッド戦略では1.80倍程度が実用的な推奨値です。",
+            help="合成オッズとは「どの買い目が的中しても同等の払戻を得られるよう配分した際の全体の想定オッズ」です。この値を下回ると『的中しても旨味が薄い（薄利多売・資金効率低下）』状態であることを警告します。守り枠（馬連・ワイド）を含むハイブリッド戦略では1.70倍程度が実用的な推奨値です。",
         )
         st.markdown(
-            '<p style="font-size: 0.95rem; color: #53565A; margin-top: 4px; line-height: 1.5;"><strong>[tips]</strong> 合成オッズを1.80倍程度に設定することで、点数の増やしすぎや低オッズ馬券の乱立によるトリガミ・資金効率低下を防止できます。守り枠（馬連・ワイド）を含む構成では1.50〜1.80倍が推奨目安です。</p>',
+            '<p style="font-size: 0.95rem; color: #53565A; margin-top: 4px; line-height: 1.5;"><strong>[tips]</strong> 合成オッズを1.70倍程度に設定することで、点数の増やしすぎや低オッズ馬券の乱立によるトリガミ・資金効率低下を防止できます。守り枠（馬連・ワイド）を含む構成では1.50〜1.70倍が推奨目安です。</p>',
             unsafe_allow_html=True,
         )
         st.session_state.sim_config.synthetic_odds_threshold = float(syn_thresh)
@@ -1282,13 +1282,22 @@ def _append_combinations(
 
 def _auto_generate_from_marks(race: RaceInfo):
     """印（◎○▲△☆）から警告ゼロを目指し最大100回試行して最適な買い目を自動選定"""
-    # もし印がすべて「無」の場合は、オッズ・人気順で印を自動補完
+    # もし印がすべて「無」の場合は、オッズ・人気順と妙味（穴馬）を考慮して印を自動補完
     if all(e.mark == "無" for e in race.entries):
         sorted_by_pop = sorted(race.entries, key=lambda x: (x.win_odds, x.popularity))
-        mark_assignment = ["◎", "○", "▲", "△", "△", "☆"]
+        mark_assignment = ["◎", "○", "▲", "△", "△"]
         for i, e in enumerate(sorted_by_pop):
             if i < len(mark_assignment):
                 e.mark = mark_assignment[i]
+
+        # ☆（穴馬・特注馬）の選定: 6〜10番人気（単勝20〜60倍前後）の中から
+        # 内枠（京都など内枠有利）や妙味のある盲点馬を1頭選定
+        ana_candidates = [e for e in sorted_by_pop if 5 <= sorted_by_pop.index(e) <= 10]
+        if ana_candidates:
+            # 内枠（1〜3枠）の馬がいれば最優先（イン強襲穴馬）
+            inner_anas = [e for e in ana_candidates if e.frame_number in (1, 2, 3)]
+            star_horse = inner_anas[0] if inner_anas else (ana_candidates[1] if len(ana_candidates) > 1 else ana_candidates[0])
+            star_horse.mark = "☆"
 
     with st.spinner("警告（トリガミ・合成オッズ閾値割れ）ゼロを目指し最大100回最適化探索中..."):
         best_bets, proposal, iters = optimize_bets_from_marks(
