@@ -676,58 +676,164 @@ def generate_synthetic_race(date: str, venue: str, race_number: int) -> RaceInfo
 # オンデマンドWebスクレイピング ＆ レース一覧取得 (方式A)
 # ==============================================================================
 
+def fetch_odds_api(race_id: str) -> Tuple[Dict[int, float], Dict[int, int]]:
+    """netkeibaオッズAPIから最新の単勝オッズと人気順を取得
+
+    Returns:
+        (odds_dict, popularity_dict)
+    """
+    odds_map: Dict[int, float] = {}
+    pop_map: Dict[int, int] = {}
+    if not race_id or not race_id.isdigit():
+        return odds_map, pop_map
+
+    url = f"https://race.netkeiba.com/api/api_get_jra_odds.html?race_id={race_id}&type=1&action=init"
+    try:
+        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            raw_odds = data.get("data", {}).get("odds", {}).get("1", {})
+            for h_str, info in raw_odds.items():
+                try:
+                    h_num = int(h_str)
+                    if info and len(info) > 0 and info[0] != "---.-":
+                        odds_map[h_num] = float(info[0])
+                    if info and len(info) > 2 and str(info[2]).isdigit():
+                        pop_map[h_num] = int(info[2])
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return odds_map, pop_map
+
+
 def fetch_monthly_race_list(year: int = 2026, month: int = 10) -> List[RaceSummary]:
-    """当月のレース一覧をオンデマンドで取得 (詳細出馬表へのアクセスは行わない)
-    メインレースだけでなく、1R〜12Rの全レースを網羅して返します。
+    """当月・直近のレース一覧をオンデマンドでリアルスクレイピング取得
+    メインレースだけでなく、各競馬場の1R〜12Rの全レースを網羅して返します。
     """
     summaries: List[RaceSummary] = []
 
-    # 1. プリセットからサマリーをまず構築
-    presets = get_preset_races()
-    for p in presets:
-        summaries.append(
-            RaceSummary(
-                race_id=p.race_id,
-                date=p.date,
-                venue=p.venue,
-                race_number=p.race_number,
-                race_name=p.race_name,
-                grade=p.grade,
-                departure_time=p.departure_time,
-                detail_url=p.source_url,
-            )
-        )
+    try:
+        # 1. netkeibaの開催日一覧を取得
+        date_url = "https://race.netkeiba.com/top/race_list_get_date_list.html?kaisai_date=&encoding=UTF-8"
+        resp = requests.get(date_url, headers=DEFAULT_HEADERS, timeout=8)
+        kaisai_dates = []
+        if resp.status_code == 200:
+            html = decode_html_bytes(resp.content)
+            soup = BeautifulSoup(html, "html.parser")
+            date_lis = soup.find_all("li", attrs={"date": True})
+            for li in date_lis:
+                d = li.get("date", "").strip()
+                if d and d not in kaisai_dates:
+                    kaisai_dates.append(d)
 
-    # 2. 主要開催日における各競馬場の1R〜12R（全レース）を網羅的に生成・追加
-    schedule = [
-        ("2026-10-18", "京都"),
-        ("2026-10-18", "東京"),
-        ("2026-10-18", "新潟"),
-        ("2026-10-19", "東京"),
-        ("2026-10-25", "京都"),
-        ("2026-10-25", "東京"),
-        ("2026-10-25", "新潟"),
-        ("2026-10-27", "東京"),
-    ]
+        # 開催日が取得できない場合は当日の前後日付を候補にする
+        if not kaisai_dates:
+            today_str = datetime.now().strftime("%Y%m%d")
+            kaisai_dates = [today_str]
 
-    for d, v in schedule:
-        for r in range(1, 13):
-            # プリセットに既存のレース（秋華賞、菊花賞、富士S等）と重複しないか確認
-            exists = any(s.date == d and s.venue == v and s.race_number == r for s in summaries)
-            if not exists:
-                race_obj = generate_synthetic_race(d, v, r)
-                summaries.append(
-                    RaceSummary(
-                        race_id=race_obj.race_id,
-                        date=race_obj.date,
-                        venue=race_obj.venue,
-                        race_number=race_obj.race_number,
-                        race_name=race_obj.race_name,
-                        grade=race_obj.grade,
-                        departure_time=race_obj.departure_time,
-                        detail_url=race_obj.source_url,
+        # 2. 各開催日のレース一覧（race_list_sub.html）をスクレイピング
+        for k_date in kaisai_dates:
+            sub_url = f"https://race.netkeiba.com/top/race_list_sub.html?kaisai_date={k_date}"
+            sub_resp = requests.get(sub_url, headers=DEFAULT_HEADERS, timeout=8)
+            if sub_resp.status_code != 200:
+                continue
+
+            sub_html = decode_html_bytes(sub_resp.content)
+            sub_soup = BeautifulSoup(sub_html, "html.parser")
+
+            # 日付のフォーマット (例: 20261018 -> 2026-10-18)
+            date_formatted = f"{k_date[:4]}-{k_date[4:6]}-{k_date[6:8]}" if len(k_date) == 8 else k_date
+
+            venue_blocks = sub_soup.find_all("dl", class_="RaceList_DataList")
+            for vb in venue_blocks:
+                title_el = vb.find("p", class_="RaceList_DataTitle")
+                v_title = title_el.text.strip() if title_el else ""
+
+                # 競馬場名を特定 (東京, 京都, 新潟, 中山, 阪神, 福島, 小倉, 中京, 札幌, 函館)
+                venue_name = "京都"
+                for v in ["東京", "中山", "京都", "阪神", "新潟", "福島", "小倉", "中京", "札幌", "函館"]:
+                    if v in v_title:
+                        venue_name = v
+                        break
+
+                r_items = vb.find_all("li", class_="RaceList_DataItem")
+                for item in r_items:
+                    r_num_el = item.find("div", class_="Race_Num")
+                    r_num_text = r_num_el.text.strip() if r_num_el else ""
+                    m_rnum = re.search(r"(\d{1,2})", r_num_text)
+                    r_num = int(m_rnum.group(1)) if m_rnum else 1
+
+                    r_name_el = item.find("span", class_="ItemTitle")
+                    r_name = r_name_el.text.strip() if r_name_el else f"{r_num}R"
+
+                    a_tag = item.find("a")
+                    href = a_tag.get("href", "") if a_tag else ""
+                    m_id = re.search(r"race_id=(\d{12})", href)
+                    if m_id:
+                        r_id = m_id.group(1)
+                    else:
+                        r_id = f"{k_date}_{venue_name}_{r_num:02d}"
+
+                    # 発走時刻
+                    time_el = item.find("span", class_="RaceList_Itemtime")
+                    dep_time = time_el.text.strip() if time_el else ""
+
+                    # グレード (G1, G2, G3 等のアイコン判定またはクラス名)
+                    grade = ""
+                    for g in ["G1", "G2", "G3", "J.G1", "J.G2", "J.G3"]:
+                        if g in r_name or g.lower() in item.get("class", []):
+                            grade = g
+                            break
+                    if not grade:
+                        if "未勝利" in r_name:
+                            grade = "未勝利"
+                        elif "新馬" in r_name:
+                            grade = "新馬"
+                        elif "1勝" in r_name:
+                            grade = "1勝クラス"
+                        elif "2勝" in r_name:
+                            grade = "2勝クラス"
+                        elif "3勝" in r_name or "特別" in r_name:
+                            grade = "特別"
+                        elif "オープン" in r_name or "OP" in r_name or "ステークス" in r_name:
+                            grade = "OP"
+                        else:
+                            grade = "一般"
+
+                    detail_url = f"https://race.netkeiba.com/race/shutuba.html?race_id={r_id}"
+
+                    summaries.append(
+                        RaceSummary(
+                            race_id=r_id,
+                            date=date_formatted,
+                            venue=venue_name,
+                            race_number=r_num,
+                            race_name=r_name,
+                            grade=grade,
+                            departure_time=dep_time,
+                            detail_url=detail_url,
+                        )
                     )
+    except Exception as e:
+        print(f"fetch_monthly_race_list スクレイピング警告: {e}")
+
+    # 万が一Webスクレイピングで1件も取得できなかった場合の安全なフォールバック
+    if not summaries:
+        presets = get_preset_races()
+        for p in presets:
+            summaries.append(
+                RaceSummary(
+                    race_id=p.race_id,
+                    date=p.date,
+                    venue=p.venue,
+                    race_number=p.race_number,
+                    race_name=p.race_name,
+                    grade=p.grade,
+                    departure_time=p.departure_time,
+                    detail_url=p.source_url,
                 )
+            )
 
     # 日付、競馬場、レース番号順に整列
     summaries.sort(key=lambda s: (s.date, s.venue, s.race_number))
@@ -735,14 +841,8 @@ def fetch_monthly_race_list(year: int = 2026, month: int = 10) -> List[RaceSumma
 
 
 def fetch_race_detail(race_id: str) -> RaceInfo:
-    """単一レースの出馬表・詳細条件を取得 (オンデマンド)"""
-    # 1. まず内蔵プリセットに合致するか検査
-    presets = get_preset_races()
-    for p in presets:
-        if p.race_id == race_id:
-            return p
-
-    # 2. race_idがgen_形式なら即座に生成
+    """単一レースの出馬表・詳細条件を取得 (オンデマンド・リアルスクレイピング優先)"""
+    # 1. race_idがgen_形式なら即座に生成（明示的なシミュレーションの場合）
     if race_id.startswith("gen_"):
         parts = race_id.split("_")
         if len(parts) >= 4:
@@ -755,131 +855,207 @@ def fetch_race_detail(race_id: str) -> RaceInfo:
             except ValueError:
                 pass
 
-    # 3. Webから取得を試行
+    # 2. Webからリアルタイム取得を試行
     url = f"https://race.netkeiba.com/race/shutuba.html?race_id={race_id}"
     try:
         return fetch_shutuba_by_url(url, race_id=race_id)
-    except Exception:
-        # 通信不可時は安全に京都11Rへフォールバック
-        return presets[0]
+    except Exception as e:
+        # 万が一取得エラーの場合、プリセットに合致するものがあればフォールバック
+        for p in get_preset_races():
+            if p.race_id == race_id:
+                return p
+        raise e
 
 
 def fetch_shutuba_by_url(url: str, race_id: Optional[str] = None) -> RaceInfo:
-    """指定URLから出馬表とオッズをスクレイピング取得"""
+    """指定URLから出馬表とオッズをリアルスクレイピング取得（出馬表とオッズAPIのハイブリッド）"""
     if not race_id:
         m = re.search(r"race_id=(\d{12})", url)
         race_id = m.group(1) if m else f"web_{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-    # プリセット一致チェック
-    for p in get_preset_races():
-        if p.race_id == race_id:
-            return p
-
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    try:
-        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
-        resp.raise_for_status()
-        html = decode_html_bytes(resp.content)
-        soup = BeautifulSoup(html, "lxml")
+    # 1. shutuba.html を取得
+    shutuba_url = f"https://race.netkeiba.com/race/shutuba.html?race_id={race_id}" if race_id.isdigit() else url
+    resp = requests.get(shutuba_url, headers=DEFAULT_HEADERS, timeout=10)
+    resp.raise_for_status()
+    html = decode_html_bytes(resp.content)
+    soup = BeautifulSoup(html, "html.parser")
 
-        # レース名取得
-        race_name_el = soup.find("div", class_=re.compile(r"RaceName|Race_Name"))
-        race_name = race_name_el.text.strip() if race_name_el else "レース詳細"
+    # レース名
+    race_name_el = soup.find("div", class_=re.compile(r"RaceName|Race_Name")) or soup.find("h1", class_=re.compile(r"RaceName|Race_Name"))
+    race_name = race_name_el.text.strip() if race_name_el else "レース詳細"
+    race_name = re.sub(r"\s+", " ", race_name).strip()
 
-        # レース情報 (距離、芝/ダ、天候、馬場)
-        race_data_el = soup.find("div", class_=re.compile(r"RaceData01|RaceData"))
-        race_data_text = race_data_el.text.strip() if race_data_el else ""
+    # レース番号
+    race_number = 11
+    r_num_el = soup.find("span", class_=re.compile(r"RaceNum")) or soup.find("div", class_=re.compile(r"RaceNum"))
+    if r_num_el:
+        m_r = re.search(r"(\d{1,2})", r_num_el.text)
+        if m_r:
+            race_number = int(m_r.group(1))
+    elif race_id and len(race_id) == 12 and race_id[-2:].isdigit():
+        race_number = int(race_id[-2:])
 
-        surface = "芝" if "芝" in race_data_text else ("ダート" if "ダ" in race_data_text else "芝")
-        dist_match = re.search(r"(\d{3,4})m", race_data_text)
-        distance = int(dist_match.group(1)) if dist_match else 2000
+    # レース条件 (距離、芝/ダート、天候、馬場状態、発走時刻)
+    race_data_el = soup.find("div", class_=re.compile(r"RaceData01|RaceData"))
+    race_data_text = race_data_el.text.strip() if race_data_el else ""
 
-        venue = "東京"
-        for v in ["東京", "中山", "京都", "阪神", "新潟", "福島", "小倉", "中京", "札幌", "函館"]:
-            if v in html[:2000]:
-                venue = v
-                break
+    surface = "芝"
+    if "ダ" in race_data_text or "ダート" in race_data_text:
+        surface = "ダート"
+    elif "障" in race_data_text or "障害" in race_data_text:
+        surface = "障害"
 
-        # 出馬表テーブルパース
-        table = soup.find("table", class_=re.compile(r"Shutuba_Table|race_table"))
-        entries: List[HorseEntry] = []
+    dist_match = re.search(r"(\d{3,4})m", race_data_text)
+    distance = int(dist_match.group(1)) if dist_match else 2000
 
-        if table:
-            rows = table.find_all("tr", class_=re.compile(r"HorseList"))
-            for idx, tr in enumerate(rows):
-                # 枠番
-                frame_td = tr.find("td", class_=re.compile(r"Waku|waku"))
-                frame_no = int(frame_td.text.strip()) if frame_td and frame_td.text.strip().isdigit() else 1
+    weather = "晴"
+    for w in ["晴", "曇", "雨", "小雨", "小雪", "雪"]:
+        if f"天候:{w}" in race_data_text or f"天候 : {w}" in race_data_text or w in race_data_text:
+            weather = w
+            break
 
-                # 馬番
-                umaban_td = tr.find("td", class_=re.compile(r"Umaban|umaban"))
-                horse_no = int(umaban_td.text.strip()) if umaban_td and umaban_td.text.strip().isdigit() else (idx + 1)
+    track_cond = "良"
+    for tc in ["良", "稍重", "稍", "重", "不良"]:
+        if f"馬場:{tc}" in race_data_text or f"馬場 : {tc}" in race_data_text or tc in race_data_text:
+            track_cond = tc
+            break
 
-                # 馬名
-                name_el = tr.find("span", class_=re.compile(r"HorseName")) or tr.find("a", href=re.compile(r"/horse/"))
-                horse_name = name_el.text.strip() if name_el else f"馬{horse_no}"
+    dep_time = "15:40"
+    time_match = re.search(r"(\d{1,2}:\d{2})", race_data_text)
+    if time_match:
+        dep_time = time_match.group(1)
 
-                # 騎手
-                jockey_el = tr.find("td", class_=re.compile(r"Jockey")) or tr.find("a", href=re.compile(r"/jockey/"))
-                jockey = jockey_el.text.strip() if jockey_el else "未定"
+    # 競馬場・日付
+    venue = "京都"
+    for v in ["東京", "中山", "京都", "阪神", "新潟", "福島", "小倉", "中京", "札幌", "函館"]:
+        if v in html[:3000]:
+            venue = v
+            break
 
-                # 単勝オッズ
-                odds_td = tr.find("td", class_=re.compile(r"Popular|Odds")) or tr.find("span", id=re.compile(r"odds"))
-                odds_text = odds_td.text.strip() if odds_td else ""
-                odds_val = 10.0
+    # 日付
+    race_date = datetime.now().strftime("%Y-%m-%d")
+    date_match = re.search(r"(\d{4})年(\d{1,2})月(\d{1,2})日", html[:4000])
+    if date_match:
+        race_date = f"{date_match.group(1)}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}"
+    elif race_id and len(race_id) == 12 and race_id[:4].isdigit():
+        race_date = f"{race_id[:4]}-{datetime.now().strftime('%m-%d')}"
+
+    # グレード
+    grade = "重賞"
+    for g in ["G1", "G2", "G3", "J.G1", "J.G2", "J.G3", "OP", "特別", "1勝クラス", "2勝クラス", "3勝クラス", "未勝利", "新馬"]:
+        if g in race_name or g in html[:3000]:
+            grade = g
+            break
+
+    # 2. 出走馬行 (tr.HorseList) を取得
+    rows = soup.find_all("tr", class_=re.compile(r"HorseList"))
+
+    # shutuba.html で馬一覧が取れなかった場合は result.html を試行
+    if not rows and race_id.isdigit():
+        result_url = f"https://race.netkeiba.com/race/result.html?race_id={race_id}"
+        r_resp = requests.get(result_url, headers=DEFAULT_HEADERS, timeout=10)
+        if r_resp.status_code == 200:
+            r_html = decode_html_bytes(r_resp.content)
+            r_soup = BeautifulSoup(r_html, "html.parser")
+            rows = r_soup.find_all("tr", class_=re.compile(r"HorseList"))
+            if rows:
+                if not race_name or race_name == "レース詳細":
+                    r_name_el = r_soup.find("div", class_=re.compile(r"RaceName|Race_Name")) or r_soup.find("h1", class_=re.compile(r"RaceName|Race_Name"))
+                    if r_name_el:
+                        race_name = r_name_el.text.strip()
+
+    # 3. オッズAPIから最新オッズを取得
+    odds_map, pop_map = fetch_odds_api(race_id)
+
+    entries: List[HorseEntry] = []
+    for idx, tr in enumerate(rows):
+        # 馬番 (馬番のない行はスキップ)
+        umaban_td = tr.find("td", class_=re.compile(r"Umaban|umaban"))
+        if not umaban_td or not umaban_td.text.strip().isdigit():
+            continue
+        horse_no = int(umaban_td.text.strip())
+
+        # 馬名 (馬名のない行はスキップ)
+        name_el = tr.find("span", class_=re.compile(r"HorseName")) or tr.find("a", href=re.compile(r"/horse/"))
+        horse_name = name_el.text.strip() if name_el else ""
+        horse_name = re.sub(r"\s+", "", horse_name)
+        if not horse_name:
+            continue
+
+        # 枠番
+        frame_td = tr.find("td", class_=re.compile(r"Waku|waku"))
+        frame_no = 1
+        if frame_td and frame_td.text.strip().isdigit():
+            frame_no = int(frame_td.text.strip())
+        else:
+            frame_no = min(8, max(1, (horse_no - 1) // 2 + 1))
+
+        # 騎手
+        jockey_el = tr.find("td", class_=re.compile(r"Jockey")) or tr.find("a", href=re.compile(r"/jockey/"))
+        jockey = jockey_el.text.strip() if jockey_el else "未定"
+        jockey = re.sub(r"\s+", "", jockey)
+
+        # 単勝オッズ & 人気
+        win_odds = odds_map.get(horse_no, 0.0)
+        pop_val = pop_map.get(horse_no, 0)
+
+        # オッズAPIで取れなかった場合のフォールバック（result画面のテーブルやHTML内の値）
+        if win_odds == 0.0:
+            odds_td = tr.find("td", class_=re.compile(r"Popular|Odds")) or tr.find("span", id=re.compile(r"odds"))
+            odds_text = odds_td.text.strip() if odds_td else ""
+            m_o = re.search(r"(\d+\.\d+)", odds_text)
+            if m_o:
                 try:
-                    odds_val = float(re.search(r"\d+\.\d+", odds_text).group(0))
-                except Exception:
-                    # 非同期オッズの場合の仮オッズ（人気順または初期値）
-                    odds_val = round(max(2.0, (idx + 1) * 2.5), 1)
-
-                # 人気順
-                pop_td = tr.find("td", class_=re.compile(r"Ninki"))
-                pop_val = idx + 1
-                try:
-                    pop_val = int(pop_td.text.strip())
+                    win_odds = float(m_o.group(1))
                 except Exception:
                     pass
 
-                entries.append(
-                    HorseEntry(
-                        frame_number=frame_no,
-                        horse_number=horse_no,
-                        horse_name=horse_name,
-                        jockey=jockey,
-                        win_odds=odds_val,
-                        popularity=pop_val,
-                    )
-                )
+        if pop_val == 0:
+            pop_td = tr.find("td", class_=re.compile(r"Ninki"))
+            if pop_td and pop_td.text.strip().isdigit():
+                pop_val = int(pop_td.text.strip())
 
-        if not entries:
-            # 取得できなかった場合はデフォルトでフォールバック
-            raise ValueError("出馬表テーブルが見つかりませんでした。")
+        # それでもオッズが未確定(0.0)の場合は初期仮オッズ
+        if win_odds <= 0.0:
+            win_odds = round(max(2.0, (idx + 1) * 2.5), 1)
+        if pop_val <= 0:
+            pop_val = idx + 1
 
-        return RaceInfo(
-            race_id=race_id,
-            date=datetime.now().strftime("%Y-%m-%d"),
-            venue=venue,
-            race_number=11,
-            race_name=race_name,
-            grade="重賞",
-            surface=surface,
-            distance=distance,
-            weather="晴",
-            track_condition="良",
-            departure_time="15:40",
-            source_url=url,
-            fetched_at=now_str,
-            entries=entries,
+        entries.append(
+            HorseEntry(
+                frame_number=frame_no,
+                horse_number=horse_no,
+                horse_name=horse_name,
+                jockey=jockey,
+                win_odds=win_odds,
+                popularity=pop_val,
+            )
         )
 
-    except Exception as e:
-        # 通信エラーまたはパースエラー時は秋華賞プリセットにフォールバック案内
-        default_race = get_preset_races()[0]
-        default_race.source_url = url
-        default_race.fetched_at = f"{now_str} (取得エラーのためフォールバック表示: {str(e)[:40]})"
-        return default_race
+    # 馬番昇順ソート
+    entries.sort(key=lambda x: x.horse_number)
+
+    if not entries:
+        raise ValueError(f"レースID {race_id} から出走馬情報を取得できませんでした。URL: {url}")
+
+    return RaceInfo(
+        race_id=race_id,
+        date=race_date,
+        venue=venue,
+        race_number=race_number,
+        race_name=race_name,
+        grade=grade,
+        surface=surface,
+        distance=distance,
+        weather=weather,
+        track_condition=track_cond,
+        departure_time=dep_time,
+        source_url=shutuba_url,
+        fetched_at=f"{now_str} (リアルWeb取得)",
+        entries=entries,
+    )
 
 
 # ==============================================================================

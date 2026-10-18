@@ -384,17 +384,30 @@ def init_session_state():
     presets = get_preset_races()
 
     if "monthly_races" not in st.session_state:
-        # 初回起動時から1R〜12Rの全レースを保持
+        # 初回起動時から最新開催の1R〜12Rの全レースをリアルタイム取得
         st.session_state.monthly_races = fetch_monthly_race_list()
-        st.session_state.monthly_races_fetched_at = "2026-10-18 10:00:00"
+        st.session_state.monthly_races_fetched_at = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if "loaded_race_details" not in st.session_state:
         # race_idごとのキャッシュ辞書
-        st.session_state.loaded_race_details = {p.race_id: p for p in presets}
+        st.session_state.loaded_race_details = {}
 
     if "current_race" not in st.session_state:
-        # デフォルトは秋華賞
-        st.session_state.current_race = presets[0]
+        # 最新開催レースの中からメイン競走（11Rや重賞）を優先してオンデマンド取得
+        target_summary = None
+        if st.session_state.monthly_races:
+            main_candidates = [s for s in st.session_state.monthly_races if s.race_number == 11 or "G1" in s.grade or "重賞" in s.grade]
+            target_summary = main_candidates[0] if main_candidates else st.session_state.monthly_races[0]
+
+        if target_summary:
+            try:
+                detail = fetch_race_detail(target_summary.race_id)
+                st.session_state.loaded_race_details[target_summary.race_id] = detail
+                st.session_state.current_race = detail
+            except Exception:
+                st.session_state.current_race = presets[0]
+        else:
+            st.session_state.current_race = presets[0]
 
     if "bets" not in st.session_state:
         # 初期の買い目リスト
@@ -531,16 +544,19 @@ def render_phase1():
         st.markdown("netkeibaなどの出馬表URLまたは12桁のレースIDを入力して単発取得します。")
         input_url = st.text_input(
             "出馬表URLまたは12桁レースID",
-            value="https://race.netkeiba.com/race/shutuba.html?race_id=202608050611",
+            value="https://race.netkeiba.com/race/shutuba.html?race_id=202608040711",
             placeholder="https://race.netkeiba.com/race/shutuba.html?race_id=...",
         )
         if st.button("このレースの詳細を手動取得", use_container_width=True):
             with st.spinner("指定されたレースの出馬表を取得中..."):
-                r_info = fetch_shutuba_by_url(input_url)
-                st.session_state.loaded_race_details[r_info.race_id] = r_info
-                st.session_state.current_race = r_info
-            st.success(f"「{r_info.race_name}」の出馬表を読み込みました！")
-            st.rerun()
+                try:
+                    r_info = fetch_shutuba_by_url(input_url)
+                    st.session_state.loaded_race_details[r_info.race_id] = r_info
+                    st.session_state.current_race = r_info
+                    st.success(f"「{r_info.race_name}」の出馬表を読み込みました！")
+                    st.rerun()
+                except Exception as ex:
+                    st.error(f"出馬表の取得に失敗しました: {ex}")
 
     # --------------------------------------------------------------------------
     # タブC: コピペ貼り付け解析
