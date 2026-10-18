@@ -419,7 +419,7 @@ def init_session_state():
             strategy_mode=StrategyMode.HYBRID,
             target_recovery_rate=1.0,
             min_bet_unit=100,
-            synthetic_odds_threshold=4.0,
+            synthetic_odds_threshold=1.8,
             surplus_rule="boost_min_payout",
         )
 
@@ -848,10 +848,10 @@ def render_phase2():
             value=float(st.session_state.sim_config.synthetic_odds_threshold),
             step=0.1,
             format="%.2f",
-            help="合成オッズとは「どの買い目が的中しても同等の払戻を得られるよう配分した際の全体の想定オッズ」です。この値を下回ると『的中しても旨味が薄い（薄利多売・資金効率低下）』状態であることを警告します。一般的に4.00倍以上が推奨されます。",
+            help="合成オッズとは「どの買い目が的中しても同等の払戻を得られるよう配分した際の全体の想定オッズ」です。この値を下回ると『的中しても旨味が薄い（薄利多売・資金効率低下）』状態であることを警告します。守り枠（馬連・ワイド）を含むハイブリッド戦略では1.80倍程度が実用的な推奨値です。",
         )
         st.markdown(
-            '<p style="font-size: 0.95rem; color: #53565A; margin-top: 4px; line-height: 1.5;"><strong>[tips]</strong> 合成オッズを4.00倍以上に設定することで、点数の増やしすぎや低オッズ馬券の乱立によるトリガミ・資金破綻リスクを未然に防止できます。</p>',
+            '<p style="font-size: 0.95rem; color: #53565A; margin-top: 4px; line-height: 1.5;"><strong>[tips]</strong> 合成オッズを1.80倍程度に設定することで、点数の増やしすぎや低オッズ馬券の乱立によるトリガミ・資金効率低下を防止できます。守り枠（馬連・ワイド）を含む構成では1.50〜1.80倍が推奨目安です。</p>',
             unsafe_allow_html=True,
         )
         st.session_state.sim_config.synthetic_odds_threshold = float(syn_thresh)
